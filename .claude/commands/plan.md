@@ -23,6 +23,7 @@ Transform the input into a battle-tested implementation plan through codebase ex
 
 | Input | Action |
 |-------|--------|
+| `#N` (GitHub issue number) | Fetch issue with `mcp__github__issue_read` (owner/repo from `git remote get-url origin`). Use title + body as feature description. Store issue number in Metadata. |
 | `.prd.md` file | Read PRD, extract next pending phase |
 | Other `.md` file | Read and extract feature description |
 | Free-form text | Use directly as feature input |
@@ -39,6 +40,18 @@ Transform the input into a battle-tested implementation plan through codebase ex
 ---
 
 ## Phase 2: EXPLORE
+
+### Read CLAUDE.md First
+
+Before touching the codebase, read `CLAUDE.md` and extract:
+
+- **Validation commands** — exact commands for lint, type check, tests (use these in every Task's Validate step and in the Validation section)
+- **Architecture rules** — layer structure, dependency direction, DDD grouping
+- **Security requirements** — input validation boundaries, auth rules, secret handling
+- **Fault tolerance requirements** — timeouts, retry policy, idempotency expectations
+- **Database rules** — migration tool, repository pattern constraints
+
+These rules are non-negotiable constraints for the plan. Every task must respect them.
 
 ### Study the Codebase
 
@@ -169,14 +182,10 @@ Execute in order. Each task is atomic and verifiable.
 ## Validation
 
 ```bash
-# Type check
-pnpm run build
-
-# Lint
-pnpm run lint
-
-# Tests
-pnpm test
+# Use the exact commands from CLAUDE.md — do not assume pnpm/npm/go/mvn
+{lint command from CLAUDE.md}
+{type check / build command from CLAUDE.md}
+{test command from CLAUDE.md}
 ```
 
 ---

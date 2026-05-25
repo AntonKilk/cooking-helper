@@ -129,16 +129,17 @@ The GitHub MCP server is always available via `mcp__github__` tools.
 
 ### Ask the user before creating issues:
 
+Determine the owner and repo from `git remote get-url origin`, then ask:
+
 ```
-Сгенерировано {count} задач. Создать их как GitHub Issues в репозитории AntonKilk/travel-search?
+Сгенерировано {count} задач. Создать их как GitHub Issues в репозитории {owner}/{repo}?
 ```
 
 ### If user confirms, for each story:
 
 1. **Create the issue** using `mcp__github__issue_write` with:
    - `method`: `"create"`
-   - `owner`: `"AntonKilk"`
-   - `repo`: `"travel-search"`
+   - `owner` and `repo`: from `git remote get-url origin`
    - `title`: Story title
    - `body`: Full description + acceptance criteria + technical notes (markdown)
    - `labels`: Array of label strings from story categories (e.g., `["feature", "scraper"]`)
@@ -157,8 +158,8 @@ The GitHub MCP server is always available via `mcp__github__` tools.
 | #3 | Story title | technical | Phase 1 |
 ...
 
-**Repository**: https://github.com/AntonKilk/travel-search/issues
-**Project board**: Add issues to GitHub Project in the repo UI to track progress on the kanban board.
+**Repository**: {owner}/{repo}/issues
+**Next step**: `/plan #N` to create an implementation plan for the first issue.
 ```
 
 ---

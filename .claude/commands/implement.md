@@ -19,6 +19,18 @@ Execute the plan end-to-end with rigorous self-validation.
 
 ## Phase 1: LOAD
 
+### Read CLAUDE.md
+
+Before reading the plan, read `CLAUDE.md` and note:
+
+- **Validation commands** — exact lint, build, test commands for this project (use these everywhere, never assume pnpm/npm/go/mvn)
+- **Architecture rules** — layer boundaries, dependency direction, DDD grouping; every file you create must respect these
+- **Security checklist** — input validation at boundaries, no hardcoded secrets, proper error messages
+- **Fault tolerance rules** — timeouts on external calls, retry policy, idempotency requirements
+- **Database rules** — migration tool in use, repository pattern
+
+If `CLAUDE.md` does not exist, stop and ask the user to run `/create-rules` first.
+
 ### Read the Plan
 
 Load the plan file and extract:
@@ -27,7 +39,7 @@ Load the plan file and extract:
 - **Patterns to Mirror** - Code to copy from
 - **Files to Change** - CREATE/UPDATE list
 - **Tasks** - Implementation order
-- **Validation Commands** - How to verify
+- **Validation Commands** - How to verify (cross-check with CLAUDE.md)
 - **GitHub Issue** - Check the plan's Metadata table for a GitHub Issue number (e.g., `#5`). If present, this issue will be updated after implementation is complete.
 
 **If plan not found:**
@@ -76,10 +88,10 @@ Before writing any code for a task:
 
 ### 3.3 Validate Immediately
 
-**After EVERY task:**
+**After EVERY task** — use the commands from `CLAUDE.md`:
 
 ```bash
-pnpm run build
+{build/type-check command from CLAUDE.md}
 ```
 
 **If it fails:**
@@ -103,15 +115,12 @@ Task 2: UPDATE src/y.ts ✅
 
 ### Run All Checks
 
+Use the exact commands from `CLAUDE.md`:
+
 ```bash
-# Type check
-pnpm run build
-
-# Lint
-pnpm run lint
-
-# Tests
-pnpm test
+{lint command}
+{type check / build command}
+{test command}
 ```
 
 **All must pass with zero errors.**
@@ -218,8 +227,7 @@ mv $ARGUMENTS .agents/plans/completed/
 ### 6.1 Add Implementation Comment
 
 Call `mcp__github__add_issue_comment` with:
-- `owner`: `"AntonKilk"`
-- `repo`: `"travel-search"`
+- `owner` and `repo`: read from `git remote get-url origin` or `CLAUDE.md`
 - `issue_number`: The issue number from the plan (e.g., `5`)
 - `body`: A summary in markdown including:
   - What was implemented
@@ -233,8 +241,7 @@ Call `mcp__github__add_issue_comment` with:
 
 If all tasks in the plan are complete, call `mcp__github__issue_write` with:
 - `method`: `"update"`
-- `owner`: `"AntonKilk"`
-- `repo`: `"travel-search"`
+- `owner` and `repo`: read from `git remote get-url origin` or `CLAUDE.md`
 - `issue_number`: The issue number from the plan
 - `state`: `"closed"`
 - `state_reason`: `"completed"`
@@ -292,5 +299,5 @@ If all tasks in the plan are complete, call `mcp__github__issue_write` with:
 |---------|--------|
 | Type check fails | Read error, fix issue, re-run |
 | Tests fail | Fix implementation or test, re-run |
-| Lint fails | Run `pnpm run lint --fix`, then manual fixes |
+| Lint fails | Run lint --fix if supported, then manual fixes |
 | Build fails | Check error output, fix and re-run |

@@ -134,3 +134,16 @@ Example:
    - Error: `Line is longer than 120 characters`
    - Fix: Break the line or extract a variable
 ```
+
+---
+
+## After Validation — What Next
+
+| Result | Action |
+|--------|--------|
+| ✅ All passing | Ready to merge. Run `/review` for code review, then merge and move to next PRD phase. |
+| ❌ Lint / style errors | Fix in place — these don't require replanning. Re-run `/validate`. |
+| ❌ Test failures — implementation bug | Fix the code. Re-run `/validate`. |
+| ❌ Test failures — wrong behaviour, missing cases | Re-open the plan: `/plan` with a description of what's wrong. Update tasks and re-run `/implement`. |
+| ❌ Architectural violation (wrong layer, missing timeout, no auth) | Re-open the plan. Add a task that fixes the violation and re-run `/implement`. |
+| ❌ Systemic failures across many files | Revisit the PRD phase. Run `/plan` on the phase again with the failures as context. |
