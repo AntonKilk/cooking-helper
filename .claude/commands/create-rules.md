@@ -225,4 +225,132 @@ Always include a style/lint check in the project's `CLAUDE.md` validation sectio
 - Python: `ruff check .`
 - JS/TS: project-specific lint script
 
+---
+
+## Architecture and Quality Standards
+
+When generating CLAUDE.md, include the relevant sections below based on project type.
+For any project with external I/O, HTTP calls, or a database — all sections apply.
+
+### Clean Architecture
+
+Add to generated CLAUDE.md:
+
+```markdown
+## Architecture
+
+### Layer rules
+- **Domain layer** (models, business logic): no dependencies on frameworks, DB, or HTTP
+- **Service layer**: orchestrates domain logic, calls repository, throws domain errors
+- **Repository/data layer**: only DB access, no business logic
+- **Handler/entry point**: validates input, calls service, maps errors to responses
+
+Dependency direction: handlers → services → repositories → domain. Never reverse.
+
+### Domain-Driven Design
+- Name types, functions, and packages after the domain concept, not the technology
+- Group code by domain feature (e.g. `internal/booking/`), not by layer (e.g. `internal/handlers/`)
+- Keep domain logic free of infrastructure concerns (no `sql.Row` in a domain struct)
+```
+
+---
+
+### Security
+
+Add to generated CLAUDE.md:
+
+```markdown
+## Security
+
+- **Secrets**: never hardcode tokens, passwords, or API keys. Use environment variables.
+- **Input validation**: validate and sanitize all external input at the boundary (handler/entry point). Trust nothing from outside.
+- **Authentication**: every non-public endpoint must verify identity before processing.
+- **Authorization**: verify the caller has permission for the specific resource, not just that they are authenticated.
+- **Errors**: never expose internal error details, stack traces, or DB messages to the caller. Log internally, return a generic message.
+- **Dependencies**: check for known vulnerabilities before adding a library (`go install golang.org/x/vuln/cmd/govulncheck@latest` for Go, `mvn dependency-check:check` for Java).
+```
+
+---
+
+### Fault Tolerance
+
+Add to generated CLAUDE.md:
+
+```markdown
+## Fault Tolerance
+
+### External calls (HTTP, DB, message brokers)
+- **Timeouts**: always set an explicit timeout on every external call. No call should block indefinitely.
+- **Retry with exponential backoff**: retry on transient errors (network, 5xx). Do NOT retry on 4xx — those are caller errors.
+  - Delays: 2s → 4s → 8s (3 attempts max as a default)
+- **Circuit Breaker**: if a dependency fails repeatedly, stop calling it for a cooldown period rather than hammering it.
+  - Use when: calling external APIs, third-party services, or slow downstream systems.
+- **Graceful degradation**: if a non-critical dependency fails, continue with reduced functionality rather than crashing.
+
+### Idempotency
+- **Mutating operations** (POST, PUT, payment, send message): design to be safe to retry.
+  - Use an idempotency key (client-supplied or derived from content) to detect and deduplicate duplicate requests.
+- **Message consumers**: an event may be delivered more than once. Consumers must handle duplicates safely (check if already processed before acting).
+
+### Rate limiting
+- Protect endpoints that call expensive resources or external APIs with a rate limit.
+- Return `429 Too Many Requests` when limit exceeded, include `Retry-After` header.
+```
+
+---
+
+### Observability
+
+Add to generated CLAUDE.md:
+
+```markdown
+## Observability
+
+### Structured logging
+- Log in a machine-readable format (JSON preferred in production).
+- Every log entry must include: timestamp, level, message, and a **correlation/request ID** to trace a request across log lines.
+- Log at boundaries: incoming request, outgoing external call, error.
+- Do NOT log sensitive data (tokens, passwords, personal data).
+- **Go**: use `log/slog` (built-in since Go 1.21) — no external library needed.
+  ```go
+  slog.Info("request received", "method", r.Method, "path", r.URL.Path, "request_id", id)
+  slog.Error("db query failed", "err", err, "request_id", id)
+  ```
+- **Java**: use SLF4J + Logback or Log4j2 with JSON encoder.
+- **Python**: use `structlog` or `logging` with a JSON formatter.
+
+### Healthcheck
+- Expose a `GET /health` (or `/healthz`) endpoint.
+- Returns `200 OK` when the service is ready to handle traffic.
+- Checks critical dependencies (DB reachable, etc.) and returns `503` if not.
+
+### Key metrics to track
+- Request latency (p50, p95, p99)
+- Error rate
+- External dependency latency and error rate
+```
+
+---
+
+### Database
+
+Add to generated CLAUDE.md:
+
+```markdown
+## Database
+
+### Migrations
+- **Never modify the schema manually**. All schema changes go through migration files.
+- Use a migration tool appropriate for the stack:
+  - Go: `golang-migrate` or `goose`
+  - Java: Liquibase or Flyway
+  - Python: Alembic
+- Migration files are version-controlled and run automatically on startup or deploy.
+
+### Access patterns
+- All DB access goes through the repository layer. No SQL in service or handler code.
+- Use transactions for operations that modify multiple tables atomically.
+- Set query timeouts to avoid long-running queries blocking the DB.
+```
+
 Style checks run as part of every pre-commit validation alongside tests.
