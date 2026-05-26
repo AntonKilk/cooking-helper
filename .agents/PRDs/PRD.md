@@ -384,9 +384,12 @@ Cooking Helper — приложение-помощник по планирова
 ## 15. Appendix
 
 ### Связанные документы
-- `PRD.md` (root) — предыдущая версия (draft v1), будет удалена после ревью v2
 - Tech design document — TBD
 - Промпт-контракты для LLM — TBD
+
+### Reference: recipe examples
+
+Папка [`recepy-examples/`](../../recepy-examples/) содержит 39 сохранённых рецептов с [ruokaboksi.fi](https://www.ruokaboksi.fi), сгруппированных в `arkiruoka/` / `jauheliha/` / `pasta/`. Используется как референс «как выглядит финский домашний рецепт» (структура, единицы измерения `tl/rkl/dl/rs/pkt/prk`, диетические теги, типичные шаги) и как seed-данные для тестов парсинга / LLM-промптов. Не часть рантайма приложения.
 
 ### Высокоуровневая модель данных (для tech design)
 
