@@ -1,8 +1,8 @@
 # PRD — Cooking Helper
 
 **Автор:** ant.kilk@gmail.com
-**Дата:** 2026-05-25
-**Статус:** Draft v2 (regenerated via `/create-prd`)
+**Дата:** 2026-05-26
+**Статус:** Draft v3 (tech stack locked-in via `.agents/tech-design.md`)
 **Репозиторий:** AntonKilk/cooking-helper
 **Ветка:** claude/finnish-recipe-meal-app-WviKP
 
@@ -156,7 +156,7 @@ Cooking Helper — приложение-помощник по планирова
 > **Note:** Детальная архитектура и стек определяются в отдельном tech design документе. Здесь — высокоуровневые принципы.
 
 **Архитектурные принципы:**
-- **Local-first данные** (с возможностью миграции на cloud) — пользовательские предпочтения и архив рецептов хранятся локально, синхронизация — будущая фича
+- **Home-network-first данные** (с возможностью миграции на cloud) — данные централизованно хранятся на домашнем сервере в SQLite, iPad — клиент в домашней сети через Tailscale Serve; iPad вне домашней сети не работает (accepted trade-off); миграция на cloud — будущая фича
 - **LLM как core engine** — генерация меню, рецептов, парсинг ингредиентов в категории происходит через LLM-вызовы; промпты — версионируемый артефакт
 - **Provider-agnostic LLM-слой** — абстракция, позволяющая в будущем подключить разные модели (по умолчанию Claude)
 - **i18n с первого коммита** — все строки UI через систему переводов, никаких хардкодов
@@ -223,29 +223,35 @@ Cooking Helper — приложение-помощник по планирова
 
 ## 8. Technology Stack
 
-> **Status:** DEFERRED to tech design document
->
-> Решения по платформе, фреймворку, БД и LLM-провайдеру принимаются в отдельной фазе. Открытые вопросы перечислены ниже.
+> **Status:** Locked-in. Полное обоснование и альтернативы — в [`.agents/tech-design.md`](../tech-design.md).
 
-**Открытые вопросы для tech design:**
-- Платформа: PWA vs Native iOS (vs React Native)
-- Frontend framework
-- Локальное хранилище: IndexedDB / SQLite / другое
-- LLM-провайдер: Claude (наиболее вероятный) vs провайдер-агностичный слой
-- Хостинг (если PWA / есть backend)
-- Стратегия изображений для рецептов (AI-генерация / стоковые / без картинок)
+**Финальный стек:**
 
-**Constraints, которые tech design должен уважать:**
+| Слой | Решение |
+|---|---|
+| Архитектура | Home-network-first (см. §6) |
+| Backend | Go + `html/template` + HTMX (SSR) |
+| Database | SQLite в Docker volume |
+| Hosting | Docker на Mac mini Intel i7 |
+| Network / TLS | Tailscale Serve (только tailnet) |
+| LLM | Anthropic Go SDK, Sonnet 4.6 + Haiku 4.5 через `internal/llm` |
+| i18n | JSON-словари + `t()` в шаблонах |
+| Клиент | PWA на iPad с Service Worker |
+| UI generation (dev-time) | Anthropic `frontend-design` skill, HTML/CSS only, Nordic Kitchen design system |
+| Изображения рецептов | Нет в MVP, emoji + типографика |
+| Экспорт shopping list | Apple Reminders через Shortcuts x-callback-url (Phase 2) |
+
+**Constraints, которые остаются valid:**
 - iPad Safari как primary target
-- Offline-first для просмотра уже сгенерированных рецептов
-- Возможность последующей миграции данных на cloud для multi-user
+- Offline-режим для уже сгенерированных рецептов (через Service Worker)
+- Модели данных с `household_id` под будущий multi-user
 
 ## 9. Security & Configuration
 
 **MVP (single household, no auth):**
 - Нет авторизации, нет аккаунтов
 - Данные хранятся локально на устройстве
-- LLM API ключ — на стороне сервиса (если есть backend) или в build-time конфиге (если pure client)
+- LLM API ключ — на сервере в env-переменной (`ANTHROPIC_API_KEY`), никогда не в коде, никогда на клиенте
 - Никаких персональных данных пользователя не отправляется в LLM, кроме: preferences (dislikes, pantry), feedback по рецептам, история генераций
 
 **Конфигурация:**
@@ -384,8 +390,8 @@ Cooking Helper — приложение-помощник по планирова
 ## 15. Appendix
 
 ### Связанные документы
-- Tech design document — TBD
-- Промпт-контракты для LLM — TBD
+- [Tech design document](../tech-design.md) — locked-in v1 (закрывает CH-1)
+- Промпт-контракты для LLM — TBD (создаются в Phase 2 при работе над CH-7)
 
 ### Reference: recipe examples
 
@@ -462,3 +468,11 @@ ShoppingListItem
 | pantry | Бакалея | Kuivatuotteet | Pantry |
 | frozen | Заморозка | Pakasteet | Frozen |
 | other | Прочее | Muut | Other |
+
+### Anthropic Skills, используемые в разработке
+
+| Skill | Назначение |
+|---|---|
+| [`frontend-design`](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md) | Генерация UI markup в Nordic Kitchen tone, output HTML/CSS only |
+
+Детали интеграции и design system — раздел 4.5 [`.agents/tech-design.md`](../tech-design.md).
