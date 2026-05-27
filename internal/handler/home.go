@@ -26,5 +26,5 @@ func (rd *renderer) Home(w http.ResponseWriter, r *http.Request) {
 		Lang:         string(LanguageFromContext(r.Context())),
 		CategoryKeys: categoryKeys,
 	}
-	rd.render(w, r, "layout", data)
+	rd.render(w, r, "home", data)
 }

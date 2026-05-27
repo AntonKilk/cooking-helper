@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"html/template"
+	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -21,8 +22,9 @@ const requestIDKey contextKey = "request_id"
 
 // NewRouter builds the application's HTTP handler: the route table wrapped in
 // language-resolution, request-ID, and structured-logging middleware. The db
-// backs the readiness probe; the bundle and tmpl drive localized rendering.
-func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template) http.Handler {
+// backs the readiness probe; the bundle and tmpl drive localized rendering;
+// staticFS serves the embedded front-end assets, manifest, and Service Worker.
+func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template, staticFS fs.FS) http.Handler {
 	rd := &renderer{tmpl: tmpl, bundle: bundle}
 	svc := service.NewHouseholdService(repository.New(db))
 	ph := &profileHandlers{rd: rd, bundle: bundle, svc: svc}
@@ -30,9 +32,14 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
 	mux.HandleFunc("GET /{$}", rd.Home)
+	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
+	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
 	mux.HandleFunc("GET /settings/profile", ph.Show)
 	mux.HandleFunc("POST /settings/profile", ph.Save)
+	mux.Handle("GET /static/", StaticFiles(staticFS))
+	mux.HandleFunc("GET /sw.js", ServiceWorker(staticFS))
+	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))
 
 	return requestLogger(logger, languageMiddleware(bundle, mux))
 }

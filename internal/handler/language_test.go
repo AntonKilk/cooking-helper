@@ -37,6 +37,8 @@ func newTestRouter(t *testing.T) http.Handler {
 	rd := &renderer{tmpl: testTemplates(t), bundle: testBundle(t)}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", rd.Home)
+	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
+	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(rd.bundle))
 	return languageMiddleware(rd.bundle, mux)
 }
@@ -70,6 +72,48 @@ func TestHomeRendersByAcceptLanguage(t *testing.T) {
 		if !strings.Contains(body, `lang="`+c.lang+`"`) {
 			t.Errorf("[%s] body missing html lang=%q", c.header, c.lang)
 		}
+	}
+}
+
+func TestHomeHTMXReturnsFragment(t *testing.T) {
+	srv := newTestRouter(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	if strings.Contains(strings.ToLower(body), "<!doctype") {
+		t.Errorf("HTMX request returned a full page, want content fragment only:\n%s", body)
+	}
+	if !strings.Contains(body, "Produce") {
+		t.Errorf("fragment missing home content:\n%s", body)
+	}
+}
+
+func TestHomeFullPageHasShell(t *testing.T) {
+	srv := newTestRouter(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(strings.ToLower(body), "<!doctype") {
+		t.Error("full page missing doctype")
+	}
+	if !strings.Contains(body, `rel="manifest"`) {
+		t.Error("full page missing PWA manifest link")
+	}
+	if !strings.Contains(body, "serviceWorker") {
+		t.Error("full page missing service worker registration")
+	}
+	if !strings.Contains(body, `class="app-header"`) {
+		t.Error("full page missing shared header")
 	}
 }
 

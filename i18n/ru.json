@@ -1,5 +1,12 @@
 {
   "app.title": "Кухонный помощник",
+  "nav.home": "Главная",
+  "nav.settings": "Настройки",
+  "home.heading": "Меню на эту неделю",
+  "home.subtitle": "Нажмите, чтобы создать план на неделю. (Скоро)",
+  "settings.heading": "Настройки",
+  "recipe.heading": "Рецепт",
+  "recipe.not_found": "Рецепт не найден.",
   "settings.language": "Язык",
   "settings.profile": "Профиль семьи",
   "profile.heading": "Профиль семьи",

@@ -1,12 +1,21 @@
-{{- define "profile" -}}
+{{- define "profile/page" -}}
 <!doctype html>
 <html lang="{{ .Lang }}">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ t "profile.heading" }}</title>
+{{ template "head" . }}
 </head>
 <body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "profile/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "profile/content" -}}
   <h1>{{ t "profile.heading" }}</h1>
 
   {{- if .Error }}
@@ -32,8 +41,4 @@
     </fieldset>
     <button type="submit">{{ t "profile.save" }}</button>
   </form>
-
-  <p><a href="/">{{ t "app.title" }}</a></p>
-</body>
-</html>
 {{- end -}}

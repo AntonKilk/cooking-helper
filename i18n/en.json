@@ -1,5 +1,12 @@
 {
   "app.title": "Cooking Helper",
+  "nav.home": "Home",
+  "nav.settings": "Settings",
+  "home.heading": "This week's menu",
+  "home.subtitle": "Tap to generate a weekly plan. (Coming soon)",
+  "settings.heading": "Settings",
+  "recipe.heading": "Recipe",
+  "recipe.not_found": "Recipe not found.",
   "settings.language": "Language",
   "settings.profile": "Household profile",
   "profile.heading": "Household profile",

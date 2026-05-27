@@ -1,5 +1,12 @@
 {
   "app.title": "Ruoka-apuri",
+  "nav.home": "Etusivu",
+  "nav.settings": "Asetukset",
+  "home.heading": "Tämän viikon ruokalista",
+  "home.subtitle": "Luo viikon suunnitelma napauttamalla. (Tulossa pian)",
+  "settings.heading": "Asetukset",
+  "recipe.heading": "Resepti",
+  "recipe.not_found": "Reseptiä ei löytynyt.",
   "settings.language": "Kieli",
   "settings.profile": "Talouden profiili",
   "profile.heading": "Talouden profiili",
