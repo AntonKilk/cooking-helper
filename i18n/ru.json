@@ -1,6 +1,13 @@
 {
   "app.title": "Кухонный помощник",
   "settings.language": "Язык",
+  "settings.profile": "Профиль семьи",
+  "profile.heading": "Профиль семьи",
+  "profile.adults": "Взрослые",
+  "profile.kids": "Дети",
+  "profile.language": "Язык",
+  "profile.save": "Сохранить",
+  "profile.error_range": "Взрослых должно быть 1–6, детей 0–6.",
   "shopping.categories_heading": "Категории покупок",
   "lang.ru": "Русский",
   "lang.fi": "Suomi",

@@ -1,6 +1,13 @@
 {
   "app.title": "Ruoka-apuri",
   "settings.language": "Kieli",
+  "settings.profile": "Talouden profiili",
+  "profile.heading": "Talouden profiili",
+  "profile.adults": "Aikuiset",
+  "profile.kids": "Lapset",
+  "profile.language": "Kieli",
+  "profile.save": "Tallenna",
+  "profile.error_range": "Aikuisia on oltava 1–6 ja lapsia 0–6.",
   "shopping.categories_heading": "Ostoskategoriat",
   "lang.ru": "Русский",
   "lang.fi": "Suomi",

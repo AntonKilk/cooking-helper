@@ -1,0 +1,87 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/AntonKilk/cooking-helper/internal/domain"
+	"github.com/AntonKilk/cooking-helper/internal/repository"
+)
+
+// ErrInvalidFamilySize is returned when the requested family composition falls
+// outside the supported range (adults 1-6, kids 0-6).
+var ErrInvalidFamilySize = errors.New("service: family size out of range")
+
+// Family size bounds enforced on every profile update. Defaults seed a brand-new
+// household on first access.
+const (
+	minAdults     = 1
+	maxAdults     = 6
+	minKids       = 0
+	maxKids       = 6
+	defaultAdults = 2
+	defaultKids   = 0
+)
+
+// householdRepo is the subset of repository.Store the service depends on, kept
+// narrow so the service can be unit-tested with a fake. *repository.Store
+// satisfies it.
+type householdRepo interface {
+	FirstHousehold(ctx context.Context) (*domain.HouseholdProfile, error)
+	CreateHousehold(ctx context.Context, h *domain.HouseholdProfile) error
+	GetHousehold(ctx context.Context, id string) (*domain.HouseholdProfile, error)
+	UpdateHousehold(ctx context.Context, h *domain.HouseholdProfile) error
+}
+
+// HouseholdService orchestrates household-profile reads and writes for the single
+// MVP household, applying defaults and validation around the repository.
+type HouseholdService struct {
+	repo householdRepo
+}
+
+// NewHouseholdService returns a service backed by the given repository.
+func NewHouseholdService(repo householdRepo) *HouseholdService {
+	return &HouseholdService{repo: repo}
+}
+
+// Current returns the single household profile, creating it with defaults
+// (defaultAdults / defaultKids, defaultLang) on first access.
+func (s *HouseholdService) Current(ctx context.Context, defaultLang domain.Language) (*domain.HouseholdProfile, error) {
+	h, err := s.repo.FirstHousehold(ctx)
+	if errors.Is(err, repository.ErrNotFound) {
+		h = &domain.HouseholdProfile{
+			Language:   defaultLang,
+			FamilySize: domain.FamilySize{Adults: defaultAdults, Kids: defaultKids},
+		}
+		if err := s.repo.CreateHousehold(ctx, h); err != nil {
+			return nil, fmt.Errorf("current household: %w", err)
+		}
+		return h, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("current household: %w", err)
+	}
+	return h, nil
+}
+
+// UpdateProfile validates and applies a family-composition and language change to
+// the household identified by id, preserving its disliked-ingredient and pantry
+// lists. It returns ErrInvalidFamilySize when the sizes are out of range.
+func (s *HouseholdService) UpdateProfile(ctx context.Context, id string, lang domain.Language, adults, kids int) (*domain.HouseholdProfile, error) {
+	if adults < minAdults || adults > maxAdults || kids < minKids || kids > maxKids {
+		return nil, ErrInvalidFamilySize
+	}
+
+	h, err := s.repo.GetHousehold(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("update profile: %w", err)
+	}
+
+	h.Language = lang
+	h.FamilySize = domain.FamilySize{Adults: adults, Kids: kids}
+	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
+		return nil, fmt.Errorf("update profile: %w", err)
+	}
+	return h, nil
+}

@@ -70,6 +70,34 @@ func TestHouseholdCRUD(t *testing.T) {
 	}
 }
 
+func TestFirstHousehold(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	if _, err := store.FirstHousehold(ctx); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("first on empty store err = %v, want ErrNotFound", err)
+	}
+
+	h := &domain.HouseholdProfile{
+		Language:   domain.LanguageEN,
+		FamilySize: domain.FamilySize{Adults: 2, Kids: 1},
+	}
+	if err := store.CreateHousehold(ctx, h); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	got, err := store.FirstHousehold(ctx)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if got.ID != h.ID {
+		t.Fatalf("id = %q, want %q", got.ID, h.ID)
+	}
+	if got.FamilySize != h.FamilySize {
+		t.Fatalf("family = %+v, want %+v", got.FamilySize, h.FamilySize)
+	}
+}
+
 func TestHouseholdNotFound(t *testing.T) {
 	store := newTestStore(t)
 
