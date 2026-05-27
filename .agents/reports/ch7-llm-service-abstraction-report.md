@@ -5,6 +5,28 @@
 **GitHub Issue**: #7 (CH-7)
 **Status**: COMPLETE
 
+## Update (provider switch to OpenAI)
+
+After the initial Anthropic-only implementation, the owner requested switching to the
+OpenAI API. Because `llm.Client` is provider-agnostic, this was an additive change — both
+providers now coexist and a caller selects one at wiring time (CH-8).
+
+- Added `internal/llm/openai` (official OpenAI Go SDK v1.12.0, Chat Completions API),
+  mirroring the anthropic client: per-attempt timeout, transient retry (network/5xx/429,
+  2s→4s→8s, max 3), SDK errors mapped to `llm.ErrTransient`/`ErrTimeout`, token+latency
+  logging without prompt contents.
+- **Models changed** from Anthropic (`claude-sonnet-4-6` / `claude-haiku-4-5-20251001`)
+  to cheap OpenAI analogs: `gpt-5.4-mini` for generation/swap (`openai.ModelGenerate`) and
+  `gpt-5.4-nano` for categorization (`openai.ModelCategorize`). GPT-5.4 Mini is cheaper than
+  Claude Haiku on input; GPT-5.4 Nano is the cheapest production tier. Exact model IDs to be
+  confirmed against `GET /v1/models` during the live test.
+- Prompt caching: OpenAI caches long stable prefixes automatically, so there is no explicit
+  cache breakpoint (unlike Anthropic's `cache_control`).
+- Added a key-gated live integration test (`internal/llm/openai/integration_test.go`) that
+  skips unless `OPENAI_API_KEY` is set.
+- The Anthropic implementation was kept (owner's choice), so the prior report content below
+  still applies to `internal/llm/anthropic`.
+
 ## Summary
 
 Implemented the provider-agnostic LLM layer in `internal/llm`. A thin `Client`
