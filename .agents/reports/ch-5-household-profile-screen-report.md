@@ -75,6 +75,13 @@ Ran the built server against a temp SQLite DB:
   planned (handler boundary validation), matching the service constants. Deliberate
   defense-in-depth, not shared to avoid a handler→service constant dependency.
 
+## Notes / Follow-ups
+
+- The profile screen uses semantic markup but **no CSS yet**. The Nordic Kitchen design
+  system (self-hosted fonts, ≥18pt body / ≥24pt headings, 44×44pt touch targets, dark mode
+  via `prefers-color-scheme`) is deferred to a dedicated styling story and not introduced
+  here.
+
 ## Tests Written
 
 | Test File | Test Cases |
