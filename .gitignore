@@ -1,0 +1,12 @@
+# Build artifacts
+/bin/
+
+# Local data (SQLite lives in a Docker volume in prod)
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local env / overrides
+.env
+*.local

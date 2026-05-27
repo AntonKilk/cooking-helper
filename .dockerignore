@@ -1,0 +1,14 @@
+.git
+.gitignore
+.agents
+.claude
+recepy-examples
+bin
+data
+*.db
+*.db-shm
+*.db-wal
+README.md
+Dockerfile
+docker-compose.yml
+.dockerignore
