@@ -61,6 +61,31 @@ func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status 
 	_, _ = buf.WriteTo(w)
 }
 
+// renderFragment executes a specific named template (e.g. "generate/cards") with
+// the active language bound to t(), buffering first so a mid-render failure never
+// emits a half-written response. Used for HTMX partials that are not full
+// page/content pairs.
+func (rd *renderer) renderFragment(w http.ResponseWriter, r *http.Request, status int, name string, data any) {
+	lang := LanguageFromContext(r.Context())
+
+	clone, err := rd.tmpl.Clone()
+	if err != nil {
+		rd.fail(w, r, "clone template", err)
+		return
+	}
+	clone.Funcs(template.FuncMap{"t": rd.bundle.Translator(lang)})
+
+	var buf bytes.Buffer
+	if err := clone.ExecuteTemplate(&buf, name, data); err != nil {
+		rd.fail(w, r, "execute fragment", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = buf.WriteTo(w)
+}
+
 // isHTMXNavigation reports whether the request is an HTMX-driven navigation that
 // should receive only the inner content fragment. History restores are excluded
 // so the browser caches the full page, not a bare fragment.

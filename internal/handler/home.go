@@ -13,18 +13,27 @@ var categoryKeys = []string{
 	"category.other",
 }
 
-// homeData is the view model for the demo/home page.
+// homeHandlers serve the home screen. canGenerate reflects whether an LLM client
+// is wired, which decides if the "generate week" button is active.
+type homeHandlers struct {
+	rd          *renderer
+	canGenerate bool
+}
+
+// homeData is the view model for the home page.
 type homeData struct {
 	Lang         string
 	CategoryKeys []string
+	CanGenerate  bool
 }
 
-// Home renders the localized demo page: the store categories plus a language
-// switcher. It exercises the i18n wiring end to end.
-func (rd *renderer) Home(w http.ResponseWriter, r *http.Request) {
+// Home renders the localized home page: the generate-week action plus the store
+// categories. The button is inert when generation is not configured.
+func (hh *homeHandlers) Home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{
 		Lang:         string(LanguageFromContext(r.Context())),
 		CategoryKeys: categoryKeys,
+		CanGenerate:  hh.canGenerate,
 	}
-	rd.render(w, r, "home", data)
+	hh.rd.render(w, r, "home", data)
 }

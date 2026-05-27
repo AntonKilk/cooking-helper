@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/AntonKilk/cooking-helper/internal/i18n"
+	"github.com/AntonKilk/cooking-helper/internal/llm"
 	"github.com/AntonKilk/cooking-helper/internal/repository"
 	"github.com/AntonKilk/cooking-helper/internal/service"
 )
@@ -24,14 +25,19 @@ const requestIDKey contextKey = "request_id"
 // language-resolution, request-ID, and structured-logging middleware. The db
 // backs the readiness probe; the bundle and tmpl drive localized rendering;
 // staticFS serves the embedded front-end assets, manifest, and Service Worker.
-func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template, staticFS fs.FS) http.Handler {
+// llmClient enables weekly generation; when nil, the feature is disabled and the
+// home screen renders the button inert (the rest of the app works unchanged).
+func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template, staticFS fs.FS, llmClient llm.Client) http.Handler {
 	rd := &renderer{tmpl: tmpl, bundle: bundle}
-	svc := service.NewHouseholdService(repository.New(db))
+	store := repository.New(db)
+	svc := service.NewHouseholdService(store)
 	ph := &profileHandlers{rd: rd, bundle: bundle, svc: svc}
+	canGenerate := llmClient != nil
+	hh := &homeHandlers{rd: rd, canGenerate: canGenerate}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
-	mux.HandleFunc("GET /{$}", rd.Home)
+	mux.HandleFunc("GET /{$}", hh.Home)
 	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
 	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
@@ -40,6 +46,11 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux.Handle("GET /static/", StaticFiles(staticFS))
 	mux.HandleFunc("GET /sw.js", ServiceWorker(staticFS))
 	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))
+
+	if canGenerate {
+		gh := &generateHandlers{rd: rd, households: svc, gen: service.NewGenerationService(llmClient, store)}
+		mux.HandleFunc("POST /generate", gh.Generate)
+	}
 
 	return requestLogger(logger, languageMiddleware(bundle, mux))
 }

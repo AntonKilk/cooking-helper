@@ -75,6 +75,88 @@ func TestWeeklyPlanCRUDWithItems(t *testing.T) {
 	}
 }
 
+func TestCreateWeekWithRecipes(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	recipes := []domain.Recipe{
+		{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "Chicken Pasta", Servings: 3, Source: domain.SourceLLM},
+		{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "Beef Tacos", Servings: 3, Source: domain.SourceLLM},
+		{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "Salmon Bowl", Servings: 3, Source: domain.SourceLLM},
+	}
+	p := &domain.WeeklyPlan{HouseholdID: h.ID, WeekStart: time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)}
+
+	if err := store.CreateWeekWithRecipes(ctx, p, recipes); err != nil {
+		t.Fatalf("create week: %v", err)
+	}
+	if p.ID == "" {
+		t.Fatal("expected generated plan ID")
+	}
+	if len(p.RecipeIDs) != 3 {
+		t.Fatalf("plan recipe_ids = %v, want 3", p.RecipeIDs)
+	}
+	for i := range recipes {
+		if recipes[i].ID == "" {
+			t.Fatalf("recipe %d missing generated ID", i)
+		}
+		if p.RecipeIDs[i] != recipes[i].ID {
+			t.Fatalf("plan.RecipeIDs[%d] = %q, want %q", i, p.RecipeIDs[i], recipes[i].ID)
+		}
+		if _, err := store.GetRecipe(ctx, recipes[i].ID); err != nil {
+			t.Fatalf("get recipe %d: %v", i, err)
+		}
+	}
+
+	got, err := store.GetWeeklyPlan(ctx, p.ID)
+	if err != nil {
+		t.Fatalf("get plan: %v", err)
+	}
+	if len(got.RecipeIDs) != 3 || got.RecipeIDs[0] != recipes[0].ID {
+		t.Fatalf("loaded recipe_ids = %v, want %v", got.RecipeIDs, p.RecipeIDs)
+	}
+
+	recent, err := store.RecentRecipes(ctx, h.ID, 10)
+	if err != nil {
+		t.Fatalf("recent: %v", err)
+	}
+	if len(recent) != 3 {
+		t.Fatalf("recent len = %d, want 3", len(recent))
+	}
+}
+
+func TestCreateWeekWithRecipesRollsBackOnFailure(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	// Reserve a plan ID so the plan INSERT collides (duplicate PK) AFTER the
+	// recipes are inserted in the same tx — exercising full rollback.
+	existing := &domain.WeeklyPlan{HouseholdID: h.ID, WeekStart: time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)}
+	if err := store.CreateWeeklyPlan(ctx, existing); err != nil {
+		t.Fatalf("seed plan: %v", err)
+	}
+
+	recipes := []domain.Recipe{
+		{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "Doomed One", Source: domain.SourceLLM},
+		{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "Doomed Two", Source: domain.SourceLLM},
+	}
+	clash := &domain.WeeklyPlan{ID: existing.ID, HouseholdID: h.ID, WeekStart: time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)}
+
+	if err := store.CreateWeekWithRecipes(ctx, clash, recipes); err == nil {
+		t.Fatal("expected duplicate-plan error, got nil")
+	}
+
+	// The recipes from the failed tx must not have persisted.
+	recent, err := store.RecentRecipes(ctx, h.ID, 10)
+	if err != nil {
+		t.Fatalf("recent: %v", err)
+	}
+	if len(recent) != 0 {
+		t.Fatalf("recent len = %d, want 0 (recipes should have rolled back)", len(recent))
+	}
+}
+
 func TestWeeklyPlanCascadeOnHouseholdDelete(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

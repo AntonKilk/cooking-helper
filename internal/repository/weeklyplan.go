@@ -18,6 +18,35 @@ func (s *Store) CreateWeeklyPlan(ctx context.Context, p *domain.WeeklyPlan) erro
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		return insertPlanWithItems(ctx, tx, p)
+	})
+}
+
+// CreateWeekWithRecipes persists a generated week — the 3 recipes and the plan
+// that references them — in a single transaction, so a partial week never lands.
+// Recipe IDs are assigned and copied into p.RecipeIDs; the plan's (possibly empty)
+// shopping list is written alongside.
+func (s *Store) CreateWeekWithRecipes(ctx context.Context, p *domain.WeeklyPlan, recipes []domain.Recipe) error {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		ids := make([]string, len(recipes))
+		for i := range recipes {
+			if err := insertRecipe(ctx, tx, &recipes[i]); err != nil {
+				return fmt.Errorf("create week recipe: %w", err)
+			}
+			ids[i] = recipes[i].ID
+		}
+		p.RecipeIDs = ids
+		return insertPlanWithItems(ctx, tx, p)
+	})
+}
+
+// insertPlanWithItems writes a weekly plan and its shopping-list items through tx,
+// assigning IDs and CreatedAt when empty. The caller owns the transaction.
+func insertPlanWithItems(ctx context.Context, tx *sql.Tx, p *domain.WeeklyPlan) error {
 	if p.ID == "" {
 		p.ID = uuid.NewString()
 	}
@@ -28,30 +57,28 @@ func (s *Store) CreateWeeklyPlan(ctx context.Context, p *domain.WeeklyPlan) erro
 		return err
 	}
 
-	return s.withTx(ctx, func(tx *sql.Tx) error {
-		const planQ = `INSERT INTO weekly_plan (id, household_id, week_start, recipe_ids, created_at)
-			VALUES (?, ?, ?, ?, ?)`
-		if _, err := tx.ExecContext(ctx, planQ,
-			p.ID, p.HouseholdID, p.WeekStart.UTC().Format(dateLayout), recipeIDs, formatTime(p.CreatedAt)); err != nil {
-			return fmt.Errorf("create weekly plan: %w", err)
-		}
+	const planQ = `INSERT INTO weekly_plan (id, household_id, week_start, recipe_ids, created_at)
+		VALUES (?, ?, ?, ?, ?)`
+	if _, err := tx.ExecContext(ctx, planQ,
+		p.ID, p.HouseholdID, p.WeekStart.UTC().Format(dateLayout), recipeIDs, formatTime(p.CreatedAt)); err != nil {
+		return fmt.Errorf("create weekly plan: %w", err)
+	}
 
-		const itemQ = `INSERT INTO shopping_list_item
-			(id, weekly_plan_id, household_id, name, amount, unit, category, checked, manually_removed, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		for i := range p.ShoppingList {
-			item := &p.ShoppingList[i]
-			if item.ID == "" {
-				item.ID = uuid.NewString()
-			}
-			if _, err := tx.ExecContext(ctx, itemQ,
-				item.ID, p.ID, p.HouseholdID, item.Name, item.Amount, item.Unit,
-				string(item.Category), item.Checked, item.ManuallyRemoved, formatTime(p.CreatedAt)); err != nil {
-				return fmt.Errorf("create shopping item: %w", err)
-			}
+	const itemQ = `INSERT INTO shopping_list_item
+		(id, weekly_plan_id, household_id, name, amount, unit, category, checked, manually_removed, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	for i := range p.ShoppingList {
+		item := &p.ShoppingList[i]
+		if item.ID == "" {
+			item.ID = uuid.NewString()
 		}
-		return nil
-	})
+		if _, err := tx.ExecContext(ctx, itemQ,
+			item.ID, p.ID, p.HouseholdID, item.Name, item.Amount, item.Unit,
+			string(item.Category), item.Checked, item.ManuallyRemoved, formatTime(p.CreatedAt)); err != nil {
+			return fmt.Errorf("create shopping item: %w", err)
+		}
+	}
+	return nil
 }
 
 // GetWeeklyPlan loads a plan and its shopping-list items, returning ErrNotFound

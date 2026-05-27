@@ -98,6 +98,65 @@ func TestRecipeCRUD(t *testing.T) {
 	}
 }
 
+func TestRecentRecipesOrderingAndLimit(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	// Insert oldest-to-newest; created_at is assigned per insert, so RecentRecipes
+	// (ORDER BY created_at DESC) must return them newest-first.
+	for _, title := range []string{"r1", "r2", "r3"} {
+		r := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: title, Source: domain.SourceLLM}
+		if err := store.CreateRecipe(ctx, r); err != nil {
+			t.Fatalf("create %s: %v", title, err)
+		}
+	}
+
+	all, err := store.RecentRecipes(ctx, h.ID, 10)
+	if err != nil {
+		t.Fatalf("recent (limit 10): %v", err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("recent len = %d, want 3", len(all))
+	}
+	if all[0].Title != "r3" || all[2].Title != "r1" {
+		t.Fatalf("order = [%s,%s,%s], want newest-first [r3,r2,r1]", all[0].Title, all[1].Title, all[2].Title)
+	}
+
+	limited, err := store.RecentRecipes(ctx, h.ID, 2)
+	if err != nil {
+		t.Fatalf("recent (limit 2): %v", err)
+	}
+	if len(limited) != 2 {
+		t.Fatalf("limited len = %d, want 2", len(limited))
+	}
+	if limited[0].Title != "r3" || limited[1].Title != "r2" {
+		t.Fatalf("limited = [%s,%s], want [r3,r2]", limited[0].Title, limited[1].Title)
+	}
+}
+
+func TestRecentRecipesScopedToHousehold(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	other := &domain.HouseholdProfile{Language: domain.LanguageEN, FamilySize: domain.FamilySize{Adults: 1}}
+	if err := store.CreateHousehold(ctx, other); err != nil {
+		t.Fatalf("create other household: %v", err)
+	}
+	if err := store.CreateRecipe(ctx, &domain.Recipe{HouseholdID: other.ID, Language: domain.LanguageEN, Title: "theirs", Source: domain.SourceLLM}); err != nil {
+		t.Fatalf("create other recipe: %v", err)
+	}
+
+	got, err := store.RecentRecipes(ctx, h.ID, 10)
+	if err != nil {
+		t.Fatalf("recent: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("recent len = %d, want 0 (another household's recipe leaked)", len(got))
+	}
+}
+
 func TestRecipeCascadeOnHouseholdDelete(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

@@ -60,7 +60,7 @@ func TestRouter_HealthzRoute(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	srv := NewRouter(slogDiscard(), db, testBundle(t), testTemplates(t), static.FS)
+	srv := NewRouter(slogDiscard(), db, testBundle(t), testTemplates(t), static.FS, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()

@@ -35,8 +35,9 @@ func testTemplates(t *testing.T) *template.Template {
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 	rd := &renderer{tmpl: testTemplates(t), bundle: testBundle(t)}
+	hh := &homeHandlers{rd: rd}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", rd.Home)
+	mux.HandleFunc("GET /{$}", hh.Home)
 	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
 	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(rd.bundle))

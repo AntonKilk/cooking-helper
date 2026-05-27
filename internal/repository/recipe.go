@@ -17,6 +17,16 @@ func (s *Store) CreateRecipe(ctx context.Context, r *domain.Recipe) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
+	if err := insertRecipe(ctx, s.db, r); err != nil {
+		return fmt.Errorf("create recipe: %w", err)
+	}
+	return nil
+}
+
+// insertRecipe writes one recipe through any execer (*sql.DB or *sql.Tx),
+// assigning a UUID and timestamps when empty. Sharing it lets a single recipe
+// write and the atomic week write reuse one INSERT.
+func insertRecipe(ctx context.Context, ex execer, r *domain.Recipe) error {
 	if r.ID == "" {
 		r.ID = uuid.NewString()
 	}
@@ -35,12 +45,11 @@ func (s *Store) CreateRecipe(ctx context.Context, r *domain.Recipe) error {
 		 ingredients, steps, source, feedback_liked, feedback_disliked, feedback_cook_again,
 		 feedback_created_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err = s.db.ExecContext(ctx, q,
+	if _, err := ex.ExecContext(ctx, q,
 		r.ID, r.HouseholdID, string(r.Language), r.Title, r.Description,
 		r.CookTimeMinutes, r.Servings, ingredients, steps, string(r.Source),
-		liked, disliked, cookAgain, fbCreated, formatTime(r.CreatedAt), formatTime(r.UpdatedAt))
-	if err != nil {
-		return fmt.Errorf("create recipe: %w", err)
+		liked, disliked, cookAgain, fbCreated, formatTime(r.CreatedAt), formatTime(r.UpdatedAt)); err != nil {
+		return err
 	}
 	return nil
 }
@@ -55,6 +64,23 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		feedback_created_at, created_at, updated_at
 		FROM recipe WHERE id = ?`
 
+	r, err := scanRecipe(s.db.QueryRowContext(ctx, q, id))
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// recipeColumns is the SELECT list shared by every recipe read so the scan order
+// in scanRecipe stays in sync with the queries.
+const recipeColumns = `id, household_id, language, title, description, cook_time_minutes, servings,
+	ingredients, steps, source, feedback_liked, feedback_disliked, feedback_cook_again,
+	feedback_created_at, created_at, updated_at`
+
+// scanRecipe maps a recipe row (in recipeColumns order) into a domain Recipe,
+// decoding the JSON, feedback, and timestamp columns. It returns ErrNotFound when
+// the underlying query yielded no row.
+func scanRecipe(row rowScanner) (*domain.Recipe, error) {
 	var (
 		r                  domain.Recipe
 		language, source   string
@@ -64,7 +90,7 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		fbCreated          sql.NullString
 		createdAt, updated string
 	)
-	err := s.db.QueryRowContext(ctx, q, id).Scan(
+	err := row.Scan(
 		&r.ID, &r.HouseholdID, &language, &r.Title, &r.Description,
 		&r.CookTimeMinutes, &r.Servings, &ingredients, &steps, &source,
 		&liked, &disliked, &cookAgain, &fbCreated, &createdAt, &updated)
@@ -72,7 +98,7 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		return nil, ErrNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get recipe: %w", err)
+		return nil, fmt.Errorf("scan recipe: %w", err)
 	}
 
 	r.Language = domain.Language(language)
@@ -93,6 +119,36 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		return nil, err
 	}
 	return &r, nil
+}
+
+// RecentRecipes loads up to limit of the household's most recently created
+// recipes, newest first. It feeds the generation prompt with week history and
+// recent feedback.
+func (s *Store) RecentRecipes(ctx context.Context, householdID string, limit int) ([]domain.Recipe, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	q := `SELECT ` + recipeColumns + `
+		FROM recipe WHERE household_id = ? ORDER BY created_at DESC LIMIT ?`
+
+	rows, err := s.db.QueryContext(ctx, q, householdID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("recent recipes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var recipes []domain.Recipe
+	for rows.Next() {
+		r, err := scanRecipe(rows)
+		if err != nil {
+			return nil, err
+		}
+		recipes = append(recipes, *r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recent recipes: %w", err)
+	}
+	return recipes, nil
 }
 
 // UpdateRecipe overwrites a recipe (including feedback) and bumps updated_at.
