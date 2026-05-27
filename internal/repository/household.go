@@ -46,28 +46,34 @@ func (s *Store) CreateHousehold(ctx context.Context, h *domain.HouseholdProfile)
 	return nil
 }
 
-// GetHousehold loads a household profile by ID, returning ErrNotFound if absent.
-func (s *Store) GetHousehold(ctx context.Context, id string) (*domain.HouseholdProfile, error) {
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
-	defer cancel()
+// householdColumns is the SELECT list shared by every household read so the scan
+// order in scanHousehold stays in sync with the queries.
+const householdColumns = `id, language, family_adults, family_kids, disliked_ingredients, pantry_basics, created_at, updated_at`
 
-	const q = `SELECT id, language, family_adults, family_kids, disliked_ingredients, pantry_basics, created_at, updated_at
-		FROM household_profile WHERE id = ?`
+// rowScanner is satisfied by *sql.Row and *sql.Rows, letting scanHousehold serve
+// both single-row and result-set queries.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
 
+// scanHousehold maps a household_profile row (in householdColumns order) into a
+// domain profile, decoding the JSON and timestamp columns. It returns ErrNotFound
+// when the underlying query yielded no row.
+func scanHousehold(row rowScanner) (*domain.HouseholdProfile, error) {
 	var (
 		h                  domain.HouseholdProfile
 		language           string
 		disliked, pantry   string
 		createdAt, updated string
 	)
-	err := s.db.QueryRowContext(ctx, q, id).Scan(
+	err := row.Scan(
 		&h.ID, &language, &h.FamilySize.Adults, &h.FamilySize.Kids,
 		&disliked, &pantry, &createdAt, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get household: %w", err)
+		return nil, fmt.Errorf("scan household: %w", err)
 	}
 
 	h.Language = domain.Language(language)
@@ -84,6 +90,25 @@ func (s *Store) GetHousehold(ctx context.Context, id string) (*domain.HouseholdP
 		return nil, err
 	}
 	return &h, nil
+}
+
+// GetHousehold loads a household profile by ID, returning ErrNotFound if absent.
+func (s *Store) GetHousehold(ctx context.Context, id string) (*domain.HouseholdProfile, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	q := `SELECT ` + householdColumns + ` FROM household_profile WHERE id = ?`
+	return scanHousehold(s.db.QueryRowContext(ctx, q, id))
+}
+
+// FirstHousehold loads the oldest household profile, the single MVP household.
+// It returns ErrNotFound when no profile exists yet.
+func (s *Store) FirstHousehold(ctx context.Context) (*domain.HouseholdProfile, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	q := `SELECT ` + householdColumns + ` FROM household_profile ORDER BY created_at ASC LIMIT 1`
+	return scanHousehold(s.db.QueryRowContext(ctx, q))
 }
 
 // UpdateHousehold overwrites a household profile and bumps updated_at. Returns

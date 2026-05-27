@@ -26,9 +26,15 @@ type renderer struct {
 	bundle *i18n.Bundle
 }
 
-// render executes the named template into a buffer first so a mid-render failure
-// does not emit a half-written page, then writes it as UTF-8 HTML.
+// render executes the named template with a 200 status.
 func (rd *renderer) render(w http.ResponseWriter, r *http.Request, name string, data any) {
+	rd.renderStatus(w, r, http.StatusOK, name, data)
+}
+
+// renderStatus executes the named template into a buffer first so a mid-render
+// failure does not emit a half-written page, then writes it as UTF-8 HTML with the
+// given status code.
+func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status int, name string, data any) {
 	lang := LanguageFromContext(r.Context())
 
 	clone, err := rd.tmpl.Clone()
@@ -45,6 +51,7 @@ func (rd *renderer) render(w http.ResponseWriter, r *http.Request, name string, 
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	_, _ = buf.WriteTo(w)
 }
 

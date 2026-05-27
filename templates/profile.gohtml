@@ -1,0 +1,39 @@
+{{- define "profile" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t "profile.heading" }}</title>
+</head>
+<body>
+  <h1>{{ t "profile.heading" }}</h1>
+
+  {{- if .Error }}
+  <p role="alert">{{ t .Error }}</p>
+  {{- end }}
+
+  <form method="post" action="/settings/profile">
+    <p>
+      <label>{{ t "profile.adults" }}
+        <input type="number" name="adults" min="1" max="6" value="{{ .Adults }}" required>
+      </label>
+    </p>
+    <p>
+      <label>{{ t "profile.kids" }}
+        <input type="number" name="kids" min="0" max="6" value="{{ .Kids }}" required>
+      </label>
+    </p>
+    <fieldset>
+      <legend>{{ t "profile.language" }}</legend>
+      <label><input type="radio" name="lang" value="ru" {{ if eq .Lang "ru" }}checked{{ end }}>{{ t "lang.ru" }}</label>
+      <label><input type="radio" name="lang" value="fi" {{ if eq .Lang "fi" }}checked{{ end }}>{{ t "lang.fi" }}</label>
+      <label><input type="radio" name="lang" value="en" {{ if eq .Lang "en" }}checked{{ end }}>{{ t "lang.en" }}</label>
+    </fieldset>
+    <button type="submit">{{ t "profile.save" }}</button>
+  </form>
+
+  <p><a href="/">{{ t "app.title" }}</a></p>
+</body>
+</html>
+{{- end -}}

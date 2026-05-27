@@ -1,6 +1,13 @@
 {
   "app.title": "Cooking Helper",
   "settings.language": "Language",
+  "settings.profile": "Household profile",
+  "profile.heading": "Household profile",
+  "profile.adults": "Adults",
+  "profile.kids": "Kids",
+  "profile.language": "Language",
+  "profile.save": "Save",
+  "profile.error_range": "Adults must be 1–6 and kids 0–6.",
   "shopping.categories_heading": "Shopping categories",
   "lang.ru": "Русский",
   "lang.fi": "Suomi",

@@ -10,6 +10,8 @@ import (
 	"net/http"
 
 	"github.com/AntonKilk/cooking-helper/internal/i18n"
+	"github.com/AntonKilk/cooking-helper/internal/repository"
+	"github.com/AntonKilk/cooking-helper/internal/service"
 )
 
 type contextKey string
@@ -22,11 +24,15 @@ const requestIDKey contextKey = "request_id"
 // backs the readiness probe; the bundle and tmpl drive localized rendering.
 func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template) http.Handler {
 	rd := &renderer{tmpl: tmpl, bundle: bundle}
+	svc := service.NewHouseholdService(repository.New(db))
+	ph := &profileHandlers{rd: rd, bundle: bundle, svc: svc}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
 	mux.HandleFunc("GET /{$}", rd.Home)
 	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
+	mux.HandleFunc("GET /settings/profile", ph.Show)
+	mux.HandleFunc("POST /settings/profile", ph.Save)
 
 	return requestLogger(logger, languageMiddleware(bundle, mux))
 }
