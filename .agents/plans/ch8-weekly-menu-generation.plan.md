@@ -114,6 +114,7 @@ type householdProfiles interface { Current(...) (...); UpdateProfile(...) (...) 
 | File | Action | Purpose |
 |------|--------|---------|
 | `internal/llm/prompts/generate_week.v1.txt` | CREATE | Versioned system/trigger prompt + JSON contract for week generation |
+| `internal/llm/prompts/recipe_examples.v1.txt` | CREATE (done) | Few-shot style reference: 3 authentic Finnish recipes per subcategory (arkiruoka/jauheliha/pasta = 9 total), extracted from `recepy-examples/` JSON-LD; folded into the cached system block |
 | `internal/service/generation.go` | CREATE | `GenerationService`: build prompt, call LLM, validate constraints, dislike post-process (1 retry), persist atomically |
 | `internal/service/generation_test.go` | CREATE | Unit tests with fake `llm.Client` + fake repo: constraint validation, dislike retry, persistence call |
 | `internal/repository/recipe.go` | UPDATE | Add `RecentRecipes(ctx, householdID, limit)` (history + feedback for the prompt) |
@@ -182,7 +183,7 @@ shopping list for CH-8). This supersedes calling `CreateRecipe`×3 +
 `source = "llm"`, `week_start = Monday of the current week (UTC)`,
 `language = household.Language`.
 
-### Prompt structure (`generate_week.v1.txt`)
+### Prompt structure (`generate_week.v1.txt` + `recipe_examples.v1.txt`)
 Single file holding the **system** block (stable/cacheable: role, hard rules,
 JSON schema, store categories, protein-tag enum) and a `---`-delimited **trigger**
 template (variable: family size, disliked list, pantry list, recent recipe
@@ -190,6 +191,18 @@ titles + feedback, target portions). Service splits on the delimiter; the system
 half is passed as `Request.System` (cache breakpoint), the rendered trigger as
 `Request.Prompt`. Recipes generated in `household.Language`. Echo the JSON schema
 into `Request.Schema` for the repair hint.
+
+**Few-shot examples.** The service also loads `recipe_examples.v1.txt` and appends
+it to the **system** block (so it rides the cache breakpoint and is paid for once
+per cache window). It holds 9 real recipes — 3 each from `arkiruoka/`,
+`jauheliha/`, `pasta/` — extracted faithfully from the `recepy-examples/` JSON-LD
+(no fabricated amounts), chosen to span protein categories (tofu/vegetarian, pork,
+beef, chicken, salmon) so they also implicitly demonstrate the ≥2-protein-variety
+rule. They are kept **in Finnish on purpose** as a *style/structure/units*
+reference (`tl/rkl/dl/rs/pkt/prk`, step granularity); the file's header instructs
+the model not to copy them and to still output in the household language and the
+required JSON schema. Budget note: ~12.7 KB (~4 k tokens) — acceptable because it
+lives in the cached stable block (CLAUDE.md › LLM caching).
 
 ### Handler / rendering
 - `POST /generate`: load `Current` household, call `svc.GenerateWeek`, on success
@@ -245,10 +258,10 @@ Do **not** read `*_BASE_URL` from env (CLAUDE.md Security: pin base URL).
 
 Execute in order. Each task is atomic and verifiable.
 
-### Task 1: Write the generation prompt
-- **File**: `internal/llm/prompts/generate_week.v1.txt`
+### Task 1: Write the generation prompt + few-shot examples
+- **File**: `internal/llm/prompts/generate_week.v1.txt` (CREATE), `internal/llm/prompts/recipe_examples.v1.txt` (CREATE — **already done**)
 - **Action**: CREATE
-- **Implement**: System block (role, hard rules incl. 100% dislike exclusion and ≥2 protein categories, the JSON schema, store-category enum, protein-tag enum) + `---` delimiter + trigger template with placeholders for family size, disliked, pantry, recent recipes+feedback, target portions. Recipes must be in the household language.
+- **Implement**: `generate_week.v1.txt` — system block (role, hard rules incl. 100% dislike exclusion and ≥2 protein categories, the JSON schema, store-category enum, protein-tag enum) + `---` delimiter + trigger template with placeholders for family size, disliked, pantry, recent recipes+feedback, target portions. Recipes must be in the household language. `recipe_examples.v1.txt` is already generated (9 faithful Finnish examples, 3 per subcategory); the service appends it to the system block (see Prompt structure). Both are picked up by the existing `*.txt` embed glob — no `embed.go` change needed.
 - **Mirror**: `internal/llm/prompts/embed.go:14-22` (versioned filename, loaded via `prompts.Load`)
 - **Validate**: `go test ./internal/llm/...`
 
