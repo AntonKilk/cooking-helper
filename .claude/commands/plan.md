@@ -93,6 +93,19 @@ Use the Explore agent to find:
 |------|------------|
 | {potential issue} | {how to handle} |
 
+### Environment & Verification
+
+Decide **up front** how each validation / E2E step will be verified — don't let the
+implementer discover mid-task that a check can't run. For every check the feature needs,
+mark whether it runs in the execution environment (see `CLAUDE.md` › Validation › *Web /
+sandbox environment constraints*). For any that can't (`govulncheck`, `docker build`,
+Service-Worker-over-HTTPS, or any networked step), name the fallback environment and the
+gate where it gets verified (typically **CH-21** at deploy).
+
+| Verification | Runs in env? | If blocked: where/when verified |
+|--------------|--------------|---------------------------------|
+| {check / E2E step} | yes / no | {networked host / Mac mini / tailnet HTTPS / CH-21} |
+
 ---
 
 ## Phase 4: GENERATE
@@ -201,6 +214,7 @@ Execute in order. Each task is atomic and verifiable.
 - [ ] Type check passes
 - [ ] Tests pass
 - [ ] Follows existing patterns
+- [ ] Environment-blocked verifications (if any) recorded with their CH-21 / networked-host gate
 ```
 
 ---

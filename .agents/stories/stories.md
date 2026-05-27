@@ -601,6 +601,10 @@ Docker на Mac mini + Tailscale Serve. Детали — [`tech-design.md`](../t
 
 #### Acceptance Criteria
 - [ ] Развёртывание на Mac mini (Docker + Tailscale Serve), iPad видит сервер по tailnet
+- [ ] **Отложенные проверки из dev-среды прогнаны на сетевом хосте** (нельзя выполнить в web-sandbox):
+  - [ ] `govulncheck ./...` зелёный — **блокер: зависимости, добавленные в CH-3 (`modernc.org/sqlite`, `golang-migrate`, `google/uuid`), ещё ни разу не сканировались**
+  - [ ] `docker build` / `docker compose up` собирается на реальных base-образах (не проверялось с CH-2)
+  - [ ] Service Worker регистрируется и кэширует shell по tailnet HTTPS на iPad Safari (CH-6)
 - [ ] Настроен ежедневный бэкап БД (`launchd` + `sqlite3 .backup`, retention 14 дней)
 - [ ] Чеклист бета-тестирования составлен (10+ сценариев из user stories)
 - [ ] 2 недели реального использования семьёй автора зафиксированы

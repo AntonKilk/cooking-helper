@@ -249,6 +249,18 @@ go test ./...          # tests
 govulncheck ./...      # dependency vulnerabilities (before adding/bumping deps)
 ```
 
+> **Web / sandbox environment constraints.** Outbound network is restricted and there is
+> no Docker daemon, so some checks **cannot run here** and must not be treated as failures:
+> - `govulncheck ./...` — `vuln.go.dev` returns `403`.
+> - `docker build` / image pulls — no daemon; Docker Hub + CDNs (unpkg, jsDelivr) return `403`.
+> - Service Worker activation — needs HTTPS (`localhost` or tailnet), unavailable in-sandbox.
+>
+> Run everything that *does* work (`gofmt`, `go vet`, `golangci-lint`, `go test`, static
+> `CGO_ENABLED=0` build, HTTP-level E2E). For the blocked ones: vendor assets from a
+> reachable pinned source (e.g. GitHub raw), then **defer-and-record** — list what was not
+> verified and where it must run (networked host / Mac mini / tailnet HTTPS). These deferred
+> checks are gated at deploy time by **CH-21**, not silently skipped.
+
 ---
 
 ## Key Files
