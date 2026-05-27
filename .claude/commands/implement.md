@@ -29,6 +29,11 @@ Before reading the plan, read `CLAUDE.md` and note:
 - **Fault tolerance rules** — timeouts on external calls, retry policy, idempotency requirements
 - **Database rules** — migration tool in use, repository pattern
 
+If `CLAUDE.md` links to a tech-design or architecture doc (e.g. `.agents/tech-design.md`),
+read it too before writing code. **Build strictly on the locked-in stack** (language,
+framework, datastore, hosting) — never substitute a different technology because it feels
+more familiar or because a plan snippet used a different one.
+
 If `CLAUDE.md` does not exist, stop and ask the user to run `/create-rules` first.
 
 ### Read the Plan

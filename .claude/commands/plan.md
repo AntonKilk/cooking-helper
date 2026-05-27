@@ -53,6 +53,11 @@ Before touching the codebase, read `CLAUDE.md` and extract:
 
 These rules are non-negotiable constraints for the plan. Every task must respect them.
 
+If `CLAUDE.md` links to a tech-design or architecture doc (e.g. `.agents/tech-design.md`),
+read it too: it holds the locked-in stack decisions and their rationale. **Do not propose a
+different language, framework, datastore, or hosting approach than what these docs lock in** —
+the plan builds on those decisions, it does not re-open them.
+
 ### Study the Codebase
 
 Use the Explore agent to find:
