@@ -1,0 +1,284 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> **Status:** Pre-code. The repo currently holds planning artifacts only
+> (`.agents/PRDs/PRD.md`, `.agents/tech-design.md`, `.agents/stories/stories.md`).
+> The stack below is **locked-in** by the tech design — build against it, do not
+> re-litigate it. When code lands, update the Commands/Key Files sections to match reality.
+
+## Project Overview
+
+Cooking Helper — a home meal-planning assistant for a family in Finland. One tap
+generates a weekly menu of 3 recipes (portioned for 7 days of eating) plus a
+consolidated, store-categorized shopping list. Personalization comes from feedback
+(like / dislike / cook-again), a disliked-ingredients list, and a pantry-basics list —
+not from manual configuration. UI is RU/FI/EN from the first commit, optimized for an
+iPad on the kitchen counter.
+
+Architecture is **home-network-first**: data lives centrally on a home server (Mac mini),
+the iPad is a thin client on the home network. The iPad does not work away from home —
+this is an accepted trade-off (shopping happens via Apple Reminders export, Phase 2).
+
+Full context: [`.agents/tech-design.md`](.agents/tech-design.md) and
+[`.agents/PRDs/PRD.md`](.agents/PRDs/PRD.md).
+
+---
+
+## Tech Stack
+
+| Technology | Purpose |
+|------------|---------|
+| **Go** | Backend, single binary, native concurrency. Default language for this owner. |
+| **`html/template` + HTMX** | Server-side rendering. No SPA, no client-side model duplication. |
+| **SQLite** (`database/sql`, no ORM) | Single-file DB in a Docker volume. Single-writer is fine for one household. |
+| **`golang-migrate`** (or `goose`) | Schema migrations. Never edit schema by hand. |
+| **Anthropic Go SDK** | LLM calls behind a provider-agnostic `internal/llm` interface. |
+| **`log/slog`** | Structured JSON logging (built-in, no external lib). |
+| **Docker + docker-compose** | Single container on Mac mini Intel i7. |
+| **Tailscale Serve** | HTTPS inside the tailnet only (HTTPS is required for Service Worker). No Funnel. |
+| **PWA** (manifest + Service Worker) | Install-to-home-screen on iPad, offline cache of generated recipes. |
+| **frontend-design skill** (dev-time only) | Generates HTML/CSS markup in the Nordic Kitchen design system. Not a runtime dependency. |
+
+**LLM models:** `claude-sonnet-4-6` for week generation / swap; `claude-haiku-4-5-20251001`
+for ingredient categorization and shopping-list normalization.
+
+---
+
+## Commands
+
+> Placeholders until the Go module exists. Update once `go.mod` and the Dockerfile land.
+
+```bash
+# Development (local)
+go run ./cmd/server
+
+# Build
+go build -o bin/server ./cmd/server
+
+# Test
+go test ./...
+
+# Migrations (golang-migrate)
+migrate -path migrations -database "sqlite3://data/cooking.db" up
+
+# Docker (production on Mac mini)
+docker compose up -d --build
+```
+
+---
+
+## Architecture
+
+Layout (see [`.agents/tech-design.md`](.agents/tech-design.md) §4.4):
+
+```
+cooking-helper/
+├── cmd/server/main.go     # entry point
+├── internal/
+│   ├── domain/            # models: Recipe, WeeklyPlan, HouseholdProfile — no infra deps
+│   ├── handler/           # HTTP handlers, grouped by feature
+│   ├── service/           # business logic, orchestration
+│   ├── repository/        # SQL access only
+│   ├── llm/               # provider-agnostic interface + anthropic/ impl + prompts/
+│   ├── i18n/              # ru/fi/en dictionaries + t() func
+│   └── shopping/          # ingredient consolidation + categorization
+├── migrations/            # golang-migrate files
+├── templates/             # *.gohtml (html/template)
+├── static/                # CSS, HTMX, Service Worker, self-hosted fonts
+└── i18n/                  # ru.json, fi.json, en.json
+```
+
+### Layer rules
+- **Domain** (models, business logic): no dependencies on frameworks, DB, or HTTP.
+- **Service**: orchestrates domain logic, calls repository, returns domain errors.
+- **Repository**: only DB access, no business logic. No SQL anywhere else.
+- **Handler**: validates input, calls service, maps errors to HTTP responses / template data.
+
+Dependency direction: **handlers → services → repositories → domain. Never reverse.**
+
+### Domain-Driven Design
+- Group code by domain feature (`internal/shopping/`), not by technical layer.
+- Name types, functions, and packages after the domain concept, not the technology.
+- Keep `sql.Row` and HTTP types out of domain structs.
+
+---
+
+## Validate Before Implementing
+
+### External integrations and data sources
+Never write code for an integration without completing this checklist:
+1. **Data is accessible** — get a real response (curl / browser). Confirm the needed data is present.
+2. **Authorization** — does it need an API key, registration, or paid plan? If yes — stop and confirm with the owner first.
+3. **Still works** — verify the endpoint/version is live right now.
+4. **Fields are parseable** — confirm required fields are actually in the response.
+
+This applies directly to the **Anthropic API** (key required — already provisioned via
+`ANTHROPIC_API_KEY` env) and to the **Apple Reminders / Shortcuts** export in Phase 2.
+
+### Third-party libraries
+Before proposing a library: check it's actively maintained, compatible with the Go
+version in use, and free of conflicts with existing dependencies. Default to the standard
+library — this project deliberately avoids an ORM and a JS framework.
+
+### Use agent-browser for web inspection
+When inspecting page markup, finding CSS selectors, or checking whether a site renders
+data without JavaScript, use the `agent-browser` skill directly. Do NOT ask the user to
+save HTML manually and do NOT guess selectors. (Relevant when parsing the `recepy-examples/`
+HTML or any future recipe source.)
+
+---
+
+## Code Patterns
+
+### Typing
+Strictly typed by default — the compiler is the first reviewer. Use explicit Go types;
+avoid `interface{}` / `any` unless genuinely necessary. Model the PRD §15 data schema as
+Go structs.
+
+### Naming & errors
+- Standard Go conventions: `MixedCaps`, short receiver names, exported docs start with the name.
+- Wrap errors with context: `fmt.Errorf("generate week: %w", err)`. Return domain errors
+  from services; never leak `sql`/HTTP details into the domain.
+
+### LLM calls (`internal/llm`)
+- All calls go through the provider-agnostic `Client` interface — no direct SDK calls in handlers/services.
+- Prompts live in version-controlled files under `internal/llm/prompts/` (e.g. `generate_week.v1.txt`).
+- Use **prompt caching**: cache the stable part (household profile + disliked + pantry + recent feedback), vary only the generation trigger.
+- **Validate LLM output against the hard constraints**: disliked ingredients must be 100% excluded — post-process and regenerate (max 1 retry) on violation.
+
+---
+
+## Security
+
+- **Secrets**: never hardcode tokens or keys. `ANTHROPIC_API_KEY` is a server-side env var only — never in code, never on the client.
+- **Input validation**: validate and sanitize all external input at the handler boundary. Trust nothing from outside, including LLM output (it's external too).
+- **Errors**: never expose internal error details, stack traces, or DB messages to the client. Log internally, return a generic message / friendly template.
+- **Privacy**: do not send personal data to the LLM beyond what the feature needs (preferences, feedback, generation history). Do not log prompt contents in production — log token count and latency only.
+- **Dependencies**: run `govulncheck ./...` before adding or bumping a library.
+- **Network**: access is tailnet-only via Tailscale Serve. Do not enable Funnel (external exposure) without explicit owner approval.
+
+> MVP has no auth (single household). When multi-user lands, add identity + per-resource
+> authorization — the schema already carries `household_id` for this.
+
+---
+
+## Fault Tolerance
+
+### External calls (Anthropic API, DB)
+- **Timeouts**: set an explicit timeout (`context.WithTimeout`) on every external call. Nothing blocks indefinitely.
+- **Retry with exponential backoff**: retry transient errors (network, 5xx) — 2s → 4s → 8s, max 3 attempts. Do NOT retry 4xx.
+- **Invalid LLM JSON**: retry once with a clarifying hint, then fail gracefully.
+- **Graceful degradation**: if the archive or a non-critical read fails, render what you can rather than 500-ing the whole page.
+
+### Idempotency
+- Feedback writes and generation triggers should be safe to retry. Service Worker queues
+  feedback writes while offline and replays them — consumers must dedupe.
+
+---
+
+## Observability
+
+### Structured logging (`log/slog`, JSON to stdout)
+- Every entry includes timestamp, level, message, and a **`request_id`** (UUID) propagated
+  across log lines and into LLM calls.
+- Log at boundaries: incoming request, outgoing LLM/DB call, error.
+- Do NOT log secrets, prompt contents, or personal data.
+
+```go
+slog.Info("request received", "method", r.Method, "path", r.URL.Path, "request_id", id)
+slog.Error("llm generate failed", "err", err, "request_id", id)
+```
+
+### Healthcheck
+- `GET /healthz` checks the DB connection, returns `200` ready / `503` not ready.
+  Tailscale Serve points its healthcheck here.
+
+### Cost
+- Log LLM token counts per call — the budget is personal use, monitor it from day one.
+
+---
+
+## Database
+
+### Migrations
+- **Never modify the schema manually.** All changes go through `golang-migrate` files in `migrations/`, version-controlled, applied on startup/deploy.
+- Schema = the data model in PRD §15 Appendix. Every table carries a `household_id` UUID for future multi-user.
+
+### Access
+- All DB access goes through `internal/repository`. No SQL in services or handlers.
+- Use transactions for multi-table atomic writes (e.g. WeeklyPlan + ShoppingList).
+- Set query timeouts via context. SQLite is single-writer — keep write transactions short.
+
+### Backup
+- Daily `launchd` job on the Mac mini does `sqlite3 .backup`, retains 14 days. Backups are
+  critical here because all data lives on one box.
+
+---
+
+## Frontend & UI Generation
+
+UI markup is generated with the Anthropic **`frontend-design`** skill, then moved into
+`templates/*.gohtml` and wired with HTMX. **Every invocation must specify:**
+
+1. Output: **HTML + CSS only** — no React, no Vue, no JSX.
+2. Design system: **Nordic Kitchen** (see [`.agents/tech-design.md`](.agents/tech-design.md) §4.5).
+3. Target: iPad Safari, kitchen context, 50cm reading distance.
+4. Constraints: **≥18pt body, ≥24pt headings, 44×44pt touch targets**, no hover-only interactions.
+
+Nordic Kitchen essentials: warm cream background `#F5EFE6`, deep oak text `#2B2118`,
+terracotta accent `#C2603A`; Fraunces headings + Public Sans body (self-hosted in
+`static/fonts/`); respect `prefers-color-scheme` for dark mode.
+
+### i18n
+All UI strings go through `t(key, args...)` registered in the template `FuncMap` — no
+hardcoded strings. Generated recipes keep the language they were created in; switching the
+UI language does not re-translate existing recipes.
+
+---
+
+## Validation
+
+Run before every commit (style checks run alongside tests):
+
+```bash
+gofmt -s -l .          # formatting (no output = clean)
+go vet ./...           # vet
+golangci-lint run ./...# lint  (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+go test ./...          # tests
+govulncheck ./...      # dependency vulnerabilities (before adding/bumping deps)
+```
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `.agents/PRDs/PRD.md` | Product requirements (v3). Source of truth for scope. |
+| `.agents/tech-design.md` | Locked-in architecture + Nordic Kitchen design system. |
+| `.agents/stories/stories.md` | User stories / work items (CH-*). |
+| `recepy-examples/` | 39 reference Finnish recipes (HTML) — seed data for parsing/LLM tests, not runtime. |
+| `cmd/server/main.go` | Entry point (once code lands). |
+| `internal/llm/` | LLM abstraction — the heart of generation. |
+
+---
+
+## On-Demand Context
+
+| Topic | File |
+|-------|------|
+| Why this stack (alternatives + trade-offs) | `.agents/tech-design.md` |
+| Scope, user stories, data model | `.agents/PRDs/PRD.md` |
+| Work items | `.agents/stories/stories.md` |
+| Design system details | `.agents/tech-design.md` §4.5 |
+
+---
+
+## Notes
+
+- **HTTPS is mandatory** for the Service Worker — that's why Tailscale Serve exists. Local `go run` over plain HTTP won't register the SW; test PWA behavior over the tailnet HTTPS URL.
+- **SQLite is single-writer.** Keep write transactions short; if concurrent family edits ever become a real bottleneck, revisit Postgres (tech-design §3.3).
+- **No images in MVP** — recipe cards use emoji + typography. No `<img>`, no image pipeline.
+- **No npm/node in production.** The frontend-design skill is a dev-time tool only.
+- The iPad **only works at home** (tailnet). Away-from-home shopping is solved by Apple Reminders export (Phase 2), not online access.
