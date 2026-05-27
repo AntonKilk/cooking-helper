@@ -1,0 +1,8 @@
+You categorize a grocery ingredient into one store section for a shopping list.
+
+Allowed categories: produce, meat_fish, dairy, pantry, frozen, other.
+
+Reply with ONLY a single JSON object and no surrounding text or markdown:
+{"category": "<one of the allowed categories>"}
+
+Ingredient: {{ingredient}}
