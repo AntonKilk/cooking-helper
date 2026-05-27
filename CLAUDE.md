@@ -33,15 +33,25 @@ Full context: [`.agents/tech-design.md`](.agents/tech-design.md) and
 | **`html/template` + HTMX** | Server-side rendering. No SPA, no client-side model duplication. |
 | **SQLite** (`database/sql`, no ORM) | Single-file DB in a Docker volume. Single-writer is fine for one household. |
 | **`golang-migrate`** (or `goose`) | Schema migrations. Never edit schema by hand. |
-| **Anthropic Go SDK** | LLM calls behind a provider-agnostic `internal/llm` interface. |
+| **LLM SDKs (Anthropic + OpenAI)** | LLM calls behind a provider-agnostic `internal/llm` interface. Either provider plugs in; call sites stay provider-neutral. |
 | **`log/slog`** | Structured JSON logging (built-in, no external lib). |
 | **Docker + docker-compose** | Single container on Mac mini Intel i7. |
 | **Tailscale Serve** | HTTPS inside the tailnet only (HTTPS is required for Service Worker). No Funnel. |
 | **PWA** (manifest + Service Worker) | Install-to-home-screen on iPad, offline cache of generated recipes. |
 | **frontend-design skill** (dev-time only) | Generates HTML/CSS markup in the Nordic Kitchen design system. Not a runtime dependency. |
 
-**LLM models:** `claude-sonnet-4-6` for week generation / swap; `claude-haiku-4-5-20251001`
-for ingredient categorization and shopping-list normalization.
+**LLM models — selected by *role*, not by name.** Call sites request a role
+(`RoleGenerate` for week generation / swap; `RoleCategorize` for ingredient
+categorization and shopping-list normalization); each provider maps the role to a
+concrete model:
+
+| Role | Anthropic | OpenAI |
+|------|-----------|--------|
+| `RoleGenerate` | `claude-sonnet-4-6` | `gpt-5.4-mini` |
+| `RoleCategorize` | `claude-haiku-4-5-20251001` | `gpt-5.4-nano` |
+
+Switching provider never touches call sites — only the wired implementation
+(`internal/llm/anthropic` or `internal/llm/openai`) changes.
 
 ---
 
@@ -80,7 +90,7 @@ cooking-helper/
 │   ├── handler/           # HTTP handlers, grouped by feature
 │   ├── service/           # business logic, orchestration
 │   ├── repository/        # SQL access only
-│   ├── llm/               # provider-agnostic interface + anthropic/ impl + prompts/
+│   ├── llm/               # provider-agnostic interface + anthropic/ + openai/ impls + prompts/
 │   ├── i18n/              # ru/fi/en dictionaries + t() func
 │   └── shopping/          # ingredient consolidation + categorization
 ├── migrations/            # golang-migrate files
@@ -113,8 +123,12 @@ Never write code for an integration without completing this checklist:
 3. **Still works** — verify the endpoint/version is live right now.
 4. **Fields are parseable** — confirm required fields are actually in the response.
 
-This applies directly to the **Anthropic API** (key required — already provisioned via
-`ANTHROPIC_API_KEY` env) and to the **Apple Reminders / Shortcuts** export in Phase 2.
+This applies directly to the **LLM provider API** — Anthropic (`ANTHROPIC_API_KEY`)
+or OpenAI (`OPENAI_API_KEY`), key required, provisioned via env — and to the
+**Apple Reminders / Shortcuts** export in Phase 2. Note: the web sandbox's egress
+allowlist may not include every provider host (e.g. `api.openai.com` is currently
+blocked — `x-deny-reason: host_not_allowed`); live calls to a blocked host must be
+deferred to a networked host (Mac mini / dev machine).
 
 ### Third-party libraries
 Before proposing a library: check it's actively maintained, compatible with the Go
@@ -142,16 +156,18 @@ Go structs.
   from services; never leak `sql`/HTTP details into the domain.
 
 ### LLM calls (`internal/llm`)
-- All calls go through the provider-agnostic `Client` interface — no direct SDK calls in handlers/services.
+- All calls go through the provider-agnostic `Client` interface — no direct SDK calls in handlers/services, no provider-specific model names at call sites.
+- **Select the model by `Role`** (`RoleGenerate` / `RoleCategorize`); the wired provider maps the role to a concrete model ID. The provider is chosen once, at the wiring site.
 - Prompts live in version-controlled files under `internal/llm/prompts/` (e.g. `generate_week.v1.txt`).
-- Use **prompt caching**: cache the stable part (household profile + disliked + pantry + recent feedback), vary only the generation trigger.
+- Use **prompt caching**: cache the stable part (household profile + disliked + pantry + recent feedback), vary only the generation trigger. Anthropic needs an explicit cache breakpoint on the System block; OpenAI caches long stable prefixes automatically.
 - **Validate LLM output against the hard constraints**: disliked ingredients must be 100% excluded — post-process and regenerate (max 1 retry) on violation.
 
 ---
 
 ## Security
 
-- **Secrets**: never hardcode tokens or keys. `ANTHROPIC_API_KEY` is a server-side env var only — never in code, never on the client.
+- **Secrets**: never hardcode tokens or keys. The LLM key (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) is a server-side env var only — never in code, never on the client.
+- **Pin the LLM base URL**: both SDKs silently honor a `*_BASE_URL` env var, which could redirect the key to an arbitrary host. Set the base URL explicitly at construction and do not read it from untrusted env.
 - **Input validation**: validate and sanitize all external input at the handler boundary. Trust nothing from outside, including LLM output (it's external too).
 - **Errors**: never expose internal error details, stack traces, or DB messages to the client. Log internally, return a generic message / friendly template.
 - **Privacy**: do not send personal data to the LLM beyond what the feature needs (preferences, feedback, generation history). Do not log prompt contents in production — log token count and latency only.
@@ -165,7 +181,7 @@ Go structs.
 
 ## Fault Tolerance
 
-### External calls (Anthropic API, DB)
+### External calls (LLM provider API, DB)
 - **Timeouts**: set an explicit timeout (`context.WithTimeout`) on every external call. Nothing blocks indefinitely.
 - **Retry with exponential backoff**: retry transient errors (network, 5xx) — 2s → 4s → 8s, max 3 attempts. Do NOT retry 4xx.
 - **Invalid LLM JSON**: retry once with a clarifying hint, then fail gracefully.
