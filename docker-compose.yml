@@ -7,6 +7,7 @@ services:
       - "8080:8080"
     environment:
       PORT: "8080"
+      DB_PATH: "/data/cooking.db"
       # Passed through from the host environment; never hardcode the key here.
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"log/slog"
 	"net/http"
@@ -14,10 +15,10 @@ type contextKey string
 const requestIDKey contextKey = "request_id"
 
 // NewRouter builds the application's HTTP handler: the route table wrapped in
-// request-ID + structured-logging middleware.
-func NewRouter(logger *slog.Logger) http.Handler {
+// request-ID + structured-logging middleware. The db backs the readiness probe.
+func NewRouter(logger *slog.Logger, db *sql.DB) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", Health)
+	mux.HandleFunc("GET /healthz", Health(db))
 
 	return requestLogger(logger, mux)
 }

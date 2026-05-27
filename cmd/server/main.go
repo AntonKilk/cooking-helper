@@ -8,14 +8,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/AntonKilk/cooking-helper/internal/handler"
+	"github.com/AntonKilk/cooking-helper/internal/repository"
 )
 
 const (
 	defaultPort     = "8080"
+	defaultDBPath   = "data/cooking.db"
 	shutdownTimeout = 10 * time.Second
 )
 
@@ -35,9 +38,28 @@ func run(logger *slog.Logger) error {
 		port = defaultPort
 	}
 
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = defaultDBPath
+	}
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		return fmt.Errorf("create db dir: %w", err)
+	}
+
+	db, err := repository.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if err := repository.RunMigrations(db); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
+	}
+	logger.Info("database ready", "path", dbPath)
+
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           handler.NewRouter(logger),
+		Handler:           handler.NewRouter(logger, db),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
