@@ -119,3 +119,56 @@ Per the issue's technical notes, the Service Worker only registers over HTTPS �
 
 Note: icons are placeholder solid-terracotta squares — replace with real artwork in a later UI
 story. Self-hosted Fraunces/Public Sans fonts are deferred (CSS uses fallback stacks).
+
+## Pre-production testing (how to verify the SW before prod)
+
+Browsers only register a Service Worker in a **secure context**: HTTPS, or `localhost`. So:
+
+1. **Desktop dev — fastest, no HTTPS needed.** `localhost` counts as secure, so the SW
+   registers over plain HTTP. Run `go run ./cmd/server` and open `http://localhost:8080` in
+   Chrome/Safari → DevTools ▸ Application ▸ Service Workers shows it active; ▸ Cache Storage
+   shows the `cooking-shell-v1` precache; toggle "Offline" and reload to confirm the shell
+   loads from cache. This validates the SW logic, the manifest, and caching — but **not on the
+   iPad**.
+2. **iPad / real device — needs HTTPS.** Recommended: run **Tailscale Serve** from the dev
+   machine (same mechanism as production), e.g. `tailscale serve https / http://localhost:8080`,
+   then open the tailnet HTTPS URL on the iPad. This is the only path that exercises the real
+   target (iPad Safari + HTTPS + install-to-home-screen). Alternatives: `mkcert` + a locally
+   trusted cert with its root CA installed on the iPad (more setup). Avoid public tunnels
+   (ngrok/cloudflared) and **do not enable Tailscale Funnel** — project policy keeps the app
+   tailnet-only (`CLAUDE.md` › Security › Network).
+3. **Quick desktop check of a non-localhost HTTP origin** (optional): launch Chrome with
+   `--unsafely-treat-insecure-origin-as-secure=http://<host>:8080 --user-data-dir=/tmp/x`.
+   For spot checks only, never for the iPad.
+
+## Tailscale story
+
+There is **no dedicated Tailscale story**. Tailscale Serve is operational/host setup:
+- `CH-2` explicitly defers it: *"Tailscale Serve настраивается на хосте, не в этой истории
+  (см. CH-21 / ops)"* (`stories.md:71`).
+- `CH-21` (Beta testing & bug bash, Phase 4) carries the deployment criterion:
+  *"Развёртывание на Mac mini (Docker + Tailscale Serve), iPad видит сервер по tailnet"*
+  (`stories.md:603`).
+
+So the tailnet HTTPS path is owned by CH-21 / ops, not by CH-6. For pre-prod you can run
+`tailscale serve` from any dev machine in the tailnet (option 2 above) without waiting for CH-21.
+
+## Consolidated side-notes & follow-ups
+
+- **SW activation not auto-tested.** Unit/E2E tests cover that `/sw.js`, `/manifest.webmanifest`,
+  `/static/*` are served correctly and that the registration script is in the page; the SW
+  actually activating + caching is verified manually (HTTPS-only) — see above.
+- **Placeholder icons.** `static/icons/icon-{192,512}.png` are solid `#C2603A` squares generated
+  with a throwaway `image/png` snippet. Replace with real artwork in a UI story (CH-19 onboarding
+  / CH-20 polish are natural homes).
+- **Fonts deferred.** Fraunces (headings) / Public Sans (body) are not self-hosted yet; CSS uses
+  serif/system-sans fallback stacks. The §4.5 design system expects them in `static/fonts/` —
+  fold into CH-20 (iPad UX polish) along with the real Nordic Kitchen pass.
+- **HTMX vendored from GitHub raw**, not unpkg/jsDelivr (both 403'd in the build env). Pinned
+  v2.0.4, byte-identical. If you later add a dependency-update process, pin/refresh it there.
+- **Recipe screen is a stub.** `/recipe/{id}` echoes the id with no persistence; the real view
+  is CH-11 (Fullscreen recipe view). The blank-id → 404 branch is defensive (the `{id}` route
+  pattern won't normally match an empty segment).
+- **`docker-compose`/Dockerfile unchanged** — assets are compiled into the binary via
+  `//go:embed`; no volume or COPY of `static/` needed at runtime.
+
