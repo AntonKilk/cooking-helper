@@ -1,0 +1,15 @@
+{
+  "app.title": "Cooking Helper",
+  "settings.language": "Language",
+  "shopping.categories_heading": "Shopping categories",
+  "lang.ru": "Русский",
+  "lang.fi": "Suomi",
+  "lang.en": "English",
+  "greeting": "Hello, %s",
+  "category.produce": "Produce",
+  "category.meat_fish": "Meat & Fish",
+  "category.dairy": "Dairy",
+  "category.pantry": "Pantry",
+  "category.frozen": "Frozen",
+  "category.other": "Other"
+}

@@ -1,0 +1,15 @@
+{
+  "app.title": "Кухонный помощник",
+  "settings.language": "Язык",
+  "shopping.categories_heading": "Категории покупок",
+  "lang.ru": "Русский",
+  "lang.fi": "Suomi",
+  "lang.en": "English",
+  "greeting": "Привет, %s",
+  "category.produce": "Овощи и фрукты",
+  "category.meat_fish": "Мясо и рыба",
+  "category.dairy": "Молочное",
+  "category.pantry": "Бакалея",
+  "category.frozen": "Заморозка",
+  "category.other": "Прочее"
+}

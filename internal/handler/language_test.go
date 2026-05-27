@@ -1,0 +1,131 @@
+package handler
+
+import (
+	"html/template"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+
+	dict "github.com/AntonKilk/cooking-helper/i18n"
+	"github.com/AntonKilk/cooking-helper/internal/domain"
+	"github.com/AntonKilk/cooking-helper/internal/i18n"
+	"github.com/AntonKilk/cooking-helper/templates"
+)
+
+func testBundle(t *testing.T) *i18n.Bundle {
+	t.Helper()
+	b, err := i18n.Load(dict.FS, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("load bundle: %v", err)
+	}
+	return b
+}
+
+func testTemplates(t *testing.T) *template.Template {
+	t.Helper()
+	tmpl, err := template.New("").Funcs(ParseFuncMap()).ParseFS(templates.FS, "*.gohtml")
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	return tmpl
+}
+
+func newTestRouter(t *testing.T) http.Handler {
+	t.Helper()
+	rd := &renderer{tmpl: testTemplates(t), bundle: testBundle(t)}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", rd.Home)
+	mux.HandleFunc("POST /settings/language", SetLanguage(rd.bundle))
+	return languageMiddleware(rd.bundle, mux)
+}
+
+func TestHomeRendersByAcceptLanguage(t *testing.T) {
+	srv := newTestRouter(t)
+	cases := []struct {
+		header string
+		want   string // a localized category string expected in the body
+		lang   string
+	}{
+		{"fi-FI,fi;q=0.9", "Pakasteet", "fi"},
+		{"ru-RU,ru;q=0.9", "Овощи и фрукты", "ru"},
+		{"en-US,en;q=0.9", "Produce", "en"},
+		{"de-DE", "Produce", "en"}, // unsupported → default EN
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Accept-Language", c.header)
+		rec := httptest.NewRecorder()
+
+		srv.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("[%s] status = %d, want 200", c.header, rec.Code)
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, c.want) {
+			t.Errorf("[%s] body missing %q", c.header, c.want)
+		}
+		if !strings.Contains(body, `lang="`+c.lang+`"`) {
+			t.Errorf("[%s] body missing html lang=%q", c.header, c.lang)
+		}
+	}
+}
+
+func TestHomeCookieWinsOverHeader(t *testing.T) {
+	srv := newTestRouter(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.AddCookie(&http.Cookie{Name: languageCookie, Value: "fi"})
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, req)
+
+	if !strings.Contains(rec.Body.String(), "Pakasteet") {
+		t.Error("cookie language (fi) did not win over Accept-Language header")
+	}
+}
+
+func TestSetLanguageSetsCookieAndRedirects(t *testing.T) {
+	srv := newTestRouter(t)
+	form := url.Values{"lang": {"ru"}}
+	req := httptest.NewRequest(http.MethodPost, "/settings/language", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/" {
+		t.Errorf("Location = %q, want %q", loc, "/")
+	}
+	var found bool
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == languageCookie && c.Value == "ru" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected lang=ru cookie to be set")
+	}
+}
+
+func TestSetLanguageRejectsUnsupported(t *testing.T) {
+	srv := newTestRouter(t)
+	form := url.Values{"lang": {"zz"}}
+	req := httptest.NewRequest(http.MethodPost, "/settings/language", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if strings.Contains(rec.Body.String(), "zz") {
+		t.Error("response should not echo the raw rejected input")
+	}
+}

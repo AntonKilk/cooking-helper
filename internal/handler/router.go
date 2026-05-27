@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"html/template"
 	"log/slog"
 	"net/http"
+
+	"github.com/AntonKilk/cooking-helper/internal/i18n"
 )
 
 type contextKey string
@@ -15,12 +18,17 @@ type contextKey string
 const requestIDKey contextKey = "request_id"
 
 // NewRouter builds the application's HTTP handler: the route table wrapped in
-// request-ID + structured-logging middleware. The db backs the readiness probe.
-func NewRouter(logger *slog.Logger, db *sql.DB) http.Handler {
+// language-resolution, request-ID, and structured-logging middleware. The db
+// backs the readiness probe; the bundle and tmpl drive localized rendering.
+func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template) http.Handler {
+	rd := &renderer{tmpl: tmpl, bundle: bundle}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
+	mux.HandleFunc("GET /{$}", rd.Home)
+	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
 
-	return requestLogger(logger, mux)
+	return requestLogger(logger, languageMiddleware(bundle, mux))
 }
 
 // RequestIDFromContext returns the request ID attached by the middleware, if any.

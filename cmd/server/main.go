@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,8 +13,12 @@ import (
 	"syscall"
 	"time"
 
+	dict "github.com/AntonKilk/cooking-helper/i18n"
+	"github.com/AntonKilk/cooking-helper/internal/domain"
 	"github.com/AntonKilk/cooking-helper/internal/handler"
+	"github.com/AntonKilk/cooking-helper/internal/i18n"
 	"github.com/AntonKilk/cooking-helper/internal/repository"
+	"github.com/AntonKilk/cooking-helper/templates"
 )
 
 const (
@@ -57,9 +62,19 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("database ready", "path", dbPath)
 
+	bundle, err := i18n.Load(dict.FS, domain.LanguageEN)
+	if err != nil {
+		return fmt.Errorf("load i18n: %w", err)
+	}
+
+	tmpl, err := template.New("").Funcs(handler.ParseFuncMap()).ParseFS(templates.FS, "*.gohtml")
+	if err != nil {
+		return fmt.Errorf("parse templates: %w", err)
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           handler.NewRouter(logger, db),
+		Handler:           handler.NewRouter(logger, db, bundle, tmpl),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

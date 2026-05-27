@@ -1,0 +1,15 @@
+{
+  "app.title": "Ruoka-apuri",
+  "settings.language": "Kieli",
+  "shopping.categories_heading": "Ostoskategoriat",
+  "lang.ru": "Русский",
+  "lang.fi": "Suomi",
+  "lang.en": "English",
+  "greeting": "Hei, %s",
+  "category.produce": "Vihannekset ja hedelmät",
+  "category.meat_fish": "Liha ja kala",
+  "category.dairy": "Maitotuotteet",
+  "category.pantry": "Kuivatuotteet",
+  "category.frozen": "Pakasteet",
+  "category.other": "Muut"
+}
