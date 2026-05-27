@@ -3,16 +3,17 @@ module github.com/AntonKilk/cooking-helper
 go 1.25.0
 
 require (
+	github.com/anthropics/anthropic-sdk-go v1.45.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/google/uuid v1.6.0
+	github.com/openai/openai-go v1.12.0
 	modernc.org/sqlite v1.50.1
 )
 
 require (
-	github.com/anthropics/anthropic-sdk-go v1.45.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
