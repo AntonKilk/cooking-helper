@@ -1,0 +1,112 @@
+/* Nordic Kitchen design system (tech-design §4.5).
+   TODO: self-host Fraunces/Public Sans (deferred to a later UI story). */
+
+:root {
+  --bg: #F5EFE6;        /* warm cream */
+  --surface: #FCFAF5;   /* ivory */
+  --text: #2B2118;      /* deep oak */
+  --text-muted: #6B5F52;/* muted brown */
+  --accent: #C2603A;    /* terracotta */
+  --success: #5C7A4E;   /* moss green */
+  --border: #E5DBC9;    /* soft sand */
+
+  --font-heading: Fraunces, Georgia, "Times New Roman", serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --space: 1.5rem;      /* 24px base padding */
+  --touch: 44px;        /* min touch target (Apple HIG) */
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 1.25rem;   /* ≥18pt body */
+  line-height: 1.6;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-heading);
+  line-height: 1.2;
+  margin: 0 0 0.5em;
+}
+
+h1 { font-size: 2.25rem; } /* ≥24pt headings */
+h2 { font-size: 1.75rem; }
+
+a { color: var(--accent); }
+
+main {
+  display: block;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: var(--space);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  padding: var(--space);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header__title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.app-header__settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch);
+  min-height: var(--touch);
+  font-size: 1.5rem;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+/* Touch-friendly controls: ≥44px targets, no hover-only interactions. */
+button,
+input,
+.lang-switcher button {
+  min-height: var(--touch);
+  font-size: 1.125rem;
+  font-family: inherit;
+}
+
+.lang-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.lang-switcher button {
+  min-width: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #2B2118;
+    --surface: #3A2E22;
+    --text: #F5EFE6;
+    --text-muted: #C9BBA8;
+    --border: #4A3C2E;
+  }
+}

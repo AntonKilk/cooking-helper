@@ -1,0 +1,30 @@
+{{- define "home/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "home/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "home/content" -}}
+  <h1>{{ t "home.heading" }}</h1>
+  <p>{{ t "home.subtitle" }}</p>
+
+  <section>
+    <h2>{{ t "shopping.categories_heading" }}</h2>
+    <ul>
+      {{- range .CategoryKeys }}
+      <li>{{ t . }}</li>
+      {{- end }}
+    </ul>
+  </section>
+{{- end -}}

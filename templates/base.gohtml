@@ -1,0 +1,26 @@
+{{- define "head" -}}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#C2603A">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <title>{{ t "app.title" }}</title>
+{{- end -}}
+
+{{- define "header" -}}
+  <header class="app-header">
+    <a href="/" hx-get="/" hx-target="#content" hx-push-url="true" class="app-header__title">{{ t "app.title" }}</a>
+    <a href="/settings" hx-get="/settings" hx-target="#content" hx-push-url="true" class="app-header__settings" aria-label="{{ t "nav.settings" }}">⚙</a>
+  </header>
+{{- end -}}
+
+{{- define "sw-register" -}}
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () {});
+      });
+    }
+  </script>
+{{- end -}}

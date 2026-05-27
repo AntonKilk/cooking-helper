@@ -18,6 +18,7 @@ import (
 	"github.com/AntonKilk/cooking-helper/internal/handler"
 	"github.com/AntonKilk/cooking-helper/internal/i18n"
 	"github.com/AntonKilk/cooking-helper/internal/repository"
+	"github.com/AntonKilk/cooking-helper/static"
 	"github.com/AntonKilk/cooking-helper/templates"
 )
 
@@ -74,7 +75,7 @@ func run(logger *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           handler.NewRouter(logger, db, bundle, tmpl),
+		Handler:           handler.NewRouter(logger, db, bundle, tmpl, static.FS),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

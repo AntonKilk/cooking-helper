@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/AntonKilk/cooking-helper/internal/repository"
+	"github.com/AntonKilk/cooking-helper/static"
 )
 
 func slogDiscard() *slog.Logger {
@@ -59,7 +60,7 @@ func TestRouter_HealthzRoute(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	srv := NewRouter(slogDiscard(), db, testBundle(t), testTemplates(t))
+	srv := NewRouter(slogDiscard(), db, testBundle(t), testTemplates(t), static.FS)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()

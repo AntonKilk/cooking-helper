@@ -26,15 +26,16 @@ type renderer struct {
 	bundle *i18n.Bundle
 }
 
-// render executes the named template with a 200 status.
-func (rd *renderer) render(w http.ResponseWriter, r *http.Request, name string, data any) {
-	rd.renderStatus(w, r, http.StatusOK, name, data)
+// render executes the named page with a 200 status.
+func (rd *renderer) render(w http.ResponseWriter, r *http.Request, page string, data any) {
+	rd.renderStatus(w, r, http.StatusOK, page, data)
 }
 
-// renderStatus executes the named template into a buffer first so a mid-render
-// failure does not emit a half-written page, then writes it as UTF-8 HTML with the
-// given status code.
-func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status int, name string, data any) {
+// renderStatus resolves page to a concrete template — "<page>/content" for an
+// HTMX navigation (the fragment swapped into #content), "<page>/page" otherwise —
+// and executes it into a buffer first so a mid-render failure does not emit a
+// half-written page, then writes it as UTF-8 HTML with the given status code.
+func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status int, page string, data any) {
 	lang := LanguageFromContext(r.Context())
 
 	clone, err := rd.tmpl.Clone()
@@ -43,6 +44,11 @@ func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status 
 		return
 	}
 	clone.Funcs(template.FuncMap{"t": rd.bundle.Translator(lang)})
+
+	name := page + "/page"
+	if isHTMXNavigation(r) {
+		name = page + "/content"
+	}
 
 	var buf bytes.Buffer
 	if err := clone.ExecuteTemplate(&buf, name, data); err != nil {
@@ -53,6 +59,14 @@ func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = buf.WriteTo(w)
+}
+
+// isHTMXNavigation reports whether the request is an HTMX-driven navigation that
+// should receive only the inner content fragment. History restores are excluded
+// so the browser caches the full page, not a bare fragment.
+func isHTMXNavigation(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true" &&
+		r.Header.Get("HX-History-Restore-Request") != "true"
 }
 
 func (rd *renderer) fail(w http.ResponseWriter, r *http.Request, msg string, err error) {

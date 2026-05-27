@@ -1,0 +1,26 @@
+{{- define "recipe/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "recipe/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "recipe/content" -}}
+  {{- if .NotFound }}
+  <h1>{{ t "recipe.heading" }}</h1>
+  <p role="alert">{{ t "recipe.not_found" }}</p>
+  {{- else }}
+  <h1>{{ t "recipe.heading" }}</h1>
+  <p>{{ .ID }}</p>
+  {{- end }}
+{{- end -}}
