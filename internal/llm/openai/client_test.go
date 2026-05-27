@@ -44,8 +44,12 @@ func TestClassifyNil(t *testing.T) {
 }
 
 func TestBuildParamsSetsModelMessagesAndDefaults(t *testing.T) {
-	params := buildParams(llm.Request{
-		Model:  ModelCategorize,
+	model, err := modelFor(llm.RoleCategorize)
+	if err != nil {
+		t.Fatalf("modelFor: %v", err)
+	}
+	params := buildParams(model, llm.Request{
+		Role:   llm.RoleCategorize,
 		System: "stable household block",
 		Prompt: "categorize: milk",
 	})
@@ -53,8 +57,8 @@ func TestBuildParamsSetsModelMessagesAndDefaults(t *testing.T) {
 	if !params.MaxCompletionTokens.Valid() || params.MaxCompletionTokens.Value != defaultMaxTokens {
 		t.Fatalf("max tokens = %+v, want default %d", params.MaxCompletionTokens, defaultMaxTokens)
 	}
-	if params.Model != string(ModelCategorize) {
-		t.Fatalf("model = %q, want %q", params.Model, ModelCategorize)
+	if params.Model != model {
+		t.Fatalf("model = %q, want %q", params.Model, model)
 	}
 	// System block first, then user prompt.
 	if len(params.Messages) != 2 {
@@ -69,7 +73,11 @@ func TestBuildParamsSetsModelMessagesAndDefaults(t *testing.T) {
 }
 
 func TestBuildParamsNoSystem(t *testing.T) {
-	params := buildParams(llm.Request{Model: ModelGenerate, Prompt: "hi", MaxTokens: 50})
+	model, err := modelFor(llm.RoleGenerate)
+	if err != nil {
+		t.Fatalf("modelFor: %v", err)
+	}
+	params := buildParams(model, llm.Request{Role: llm.RoleGenerate, Prompt: "hi", MaxTokens: 50})
 	if len(params.Messages) != 1 {
 		t.Fatalf("messages = %d, want 1 (user only)", len(params.Messages))
 	}

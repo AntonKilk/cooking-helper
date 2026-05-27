@@ -19,6 +19,22 @@ const (
 	defaultMaxTokens = 1024
 )
 
+// models maps each provider-agnostic role to a concrete Anthropic model ID.
+// Sonnet covers generation/swaps (variety and nuance); Haiku covers cheap,
+// high-volume work like ingredient categorization.
+var models = map[llm.Role]string{
+	llm.RoleGenerate:   "claude-sonnet-4-6",
+	llm.RoleCategorize: "claude-haiku-4-5-20251001",
+}
+
+func modelFor(role llm.Role) (string, error) {
+	id, ok := models[role]
+	if !ok {
+		return "", fmt.Errorf("anthropic: no model mapped for role %d", role)
+	}
+	return id, nil
+}
+
 // messageAPI is the slice of the SDK this client uses, kept as an interface so
 // the build wiring is explicit and the type is documented in one place.
 type messageAPI interface {
@@ -63,11 +79,15 @@ func New(apiKey string, opts ...Option) *Client {
 // Complete sends one request to Anthropic. Each attempt runs under its own
 // timeout; transient failures are retried per llm.Retry.
 func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Completion, error) {
-	params := buildParams(req)
+	model, err := modelFor(req.Role)
+	if err != nil {
+		return llm.Completion{}, err
+	}
+	params := buildParams(model, req)
 
 	var msg *sdk.Message
 	start := time.Now()
-	err := llm.Retry(ctx, func() error {
+	err = llm.Retry(ctx, func() error {
 		callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 		defer cancel()
 
@@ -91,7 +111,7 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Completion,
 	}
 
 	c.logger.Info("llm complete",
-		"model", string(req.Model),
+		"model", model,
 		"input_tokens", comp.Usage.InputTokens,
 		"output_tokens", comp.Usage.OutputTokens,
 		"latency_ms", time.Since(start).Milliseconds(),
@@ -100,14 +120,14 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Completion,
 	return comp, nil
 }
 
-func buildParams(req llm.Request) sdk.MessageNewParams {
+func buildParams(model string, req llm.Request) sdk.MessageNewParams {
 	maxTokens := req.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = defaultMaxTokens
 	}
 
 	params := sdk.MessageNewParams{
-		Model:     sdk.Model(req.Model),
+		Model:     sdk.Model(model),
 		MaxTokens: int64(maxTokens),
 		Messages: []sdk.MessageParam{
 			sdk.NewUserMessage(sdk.NewTextBlock(req.Prompt)),

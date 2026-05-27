@@ -7,14 +7,19 @@ import (
 	"fmt"
 )
 
-// Model identifies which Claude model serves a request. Sonnet handles
-// generation and swaps (variety and nuance); Haiku handles cheaper,
-// high-volume work like ingredient categorization.
-type Model string
+// Role selects which model serves a request by the job it does rather than by a
+// provider-specific name. Each Client implementation maps a Role to a concrete
+// model ID, so callers stay provider-agnostic: switching providers never touches
+// call sites.
+type Role int
 
 const (
-	ModelSonnet Model = "claude-sonnet-4-6"
-	ModelHaiku  Model = "claude-haiku-4-5-20251001"
+	// RoleGenerate handles week generation and swaps — work that needs variety
+	// and nuance.
+	RoleGenerate Role = iota
+	// RoleCategorize handles cheap, high-volume work like ingredient
+	// categorization and shopping-list normalization.
+	RoleCategorize
 )
 
 // Sentinel errors let callers branch on failure mode without depending on the
@@ -34,7 +39,7 @@ var (
 // holds the variable trigger. Schema, when set, is echoed back into the repair
 // hint if the first reply is not valid JSON.
 type Request struct {
-	Model     Model
+	Role      Role
 	System    string
 	Prompt    string
 	Schema    string

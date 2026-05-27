@@ -18,14 +18,22 @@ const (
 	defaultMaxTokens = 1024
 )
 
-// Recommended cheap models for each role, mirroring the Sonnet/Haiku split.
-// Verify the exact IDs against GET /v1/models for the target account.
-const (
-	// ModelGenerate handles week generation and swaps (variety and nuance).
-	ModelGenerate llm.Model = "gpt-5.4-mini"
-	// ModelCategorize handles cheap, high-volume work like ingredient categorization.
-	ModelCategorize llm.Model = "gpt-5.4-nano"
-)
+// models maps each provider-agnostic role to a concrete OpenAI model ID.
+// gpt-5.4-mini covers generation/swaps (variety and nuance); gpt-5.4-nano covers
+// cheap, high-volume work like ingredient categorization. Verify the exact IDs
+// against GET /v1/models for the target account.
+var models = map[llm.Role]string{
+	llm.RoleGenerate:   "gpt-5.4-mini",
+	llm.RoleCategorize: "gpt-5.4-nano",
+}
+
+func modelFor(role llm.Role) (string, error) {
+	id, ok := models[role]
+	if !ok {
+		return "", fmt.Errorf("openai: no model mapped for role %d", role)
+	}
+	return id, nil
+}
 
 // completionAPI is the slice of the SDK this client uses, kept as an interface
 // so the build wiring is explicit and the surface is documented in one place.
@@ -71,11 +79,15 @@ func New(apiKey string, opts ...Option) *Client {
 // Complete sends one request to OpenAI. Each attempt runs under its own timeout;
 // transient failures are retried per llm.Retry.
 func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Completion, error) {
-	params := buildParams(req)
+	model, err := modelFor(req.Role)
+	if err != nil {
+		return llm.Completion{}, err
+	}
+	params := buildParams(model, req)
 
 	var resp *sdk.ChatCompletion
 	start := time.Now()
-	err := llm.Retry(ctx, func() error {
+	err = llm.Retry(ctx, func() error {
 		callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 		defer cancel()
 
@@ -99,7 +111,7 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Completion,
 	}
 
 	c.logger.Info("llm complete",
-		"model", string(req.Model),
+		"model", model,
 		"input_tokens", comp.Usage.InputTokens,
 		"output_tokens", comp.Usage.OutputTokens,
 		"latency_ms", time.Since(start).Milliseconds(),
@@ -108,7 +120,7 @@ func (c *Client) Complete(ctx context.Context, req llm.Request) (llm.Completion,
 	return comp, nil
 }
 
-func buildParams(req llm.Request) sdk.ChatCompletionNewParams {
+func buildParams(model string, req llm.Request) sdk.ChatCompletionNewParams {
 	maxTokens := req.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = defaultMaxTokens
@@ -121,7 +133,7 @@ func buildParams(req llm.Request) sdk.ChatCompletionNewParams {
 	messages = append(messages, sdk.UserMessage(req.Prompt))
 
 	return sdk.ChatCompletionNewParams{
-		Model:               string(req.Model),
+		Model:               model,
 		MaxCompletionTokens: sdk.Int(int64(maxTokens)),
 		Messages:            messages,
 	}

@@ -46,8 +46,12 @@ func TestClassifyNil(t *testing.T) {
 }
 
 func TestBuildParamsSetsCacheControlAndDefaults(t *testing.T) {
-	params := buildParams(llm.Request{
-		Model:  llm.ModelHaiku,
+	model, err := modelFor(llm.RoleCategorize)
+	if err != nil {
+		t.Fatalf("modelFor: %v", err)
+	}
+	params := buildParams(model, llm.Request{
+		Role:   llm.RoleCategorize,
 		System: "stable household block",
 		Prompt: "categorize: milk",
 	})
@@ -55,8 +59,8 @@ func TestBuildParamsSetsCacheControlAndDefaults(t *testing.T) {
 	if params.MaxTokens != defaultMaxTokens {
 		t.Fatalf("max tokens = %d, want default %d", params.MaxTokens, defaultMaxTokens)
 	}
-	if string(params.Model) != string(llm.ModelHaiku) {
-		t.Fatalf("model = %q, want %q", params.Model, llm.ModelHaiku)
+	if string(params.Model) != model {
+		t.Fatalf("model = %q, want %q", params.Model, model)
 	}
 	if len(params.System) != 1 {
 		t.Fatalf("system blocks = %d, want 1", len(params.System))
@@ -77,7 +81,11 @@ func TestBuildParamsSetsCacheControlAndDefaults(t *testing.T) {
 }
 
 func TestBuildParamsNoSystem(t *testing.T) {
-	params := buildParams(llm.Request{Model: llm.ModelSonnet, Prompt: "hi", MaxTokens: 50})
+	model, err := modelFor(llm.RoleGenerate)
+	if err != nil {
+		t.Fatalf("modelFor: %v", err)
+	}
+	params := buildParams(model, llm.Request{Role: llm.RoleGenerate, Prompt: "hi", MaxTokens: 50})
 	if len(params.System) != 0 {
 		t.Fatalf("system blocks = %d, want 0", len(params.System))
 	}

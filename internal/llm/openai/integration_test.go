@@ -37,7 +37,7 @@ func TestCategorizeLive(t *testing.T) {
 	defer cancel()
 
 	got, err := llm.Generate[categorized](ctx, client, llm.Request{
-		Model:     openai.ModelCategorize,
+		Role:      llm.RoleCategorize,
 		Prompt:    prompt + "\nIngredient: maito (milk)",
 		Schema:    `{"category":"produce|meat_fish|dairy|pantry|frozen|other"}`,
 		MaxTokens: 50,
