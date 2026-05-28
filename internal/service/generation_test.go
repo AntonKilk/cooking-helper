@@ -130,6 +130,35 @@ func TestGenerateWeekDislikeRetrySucceeds(t *testing.T) {
 	}
 }
 
+func TestGenerateWeekDislikeRetrySucceedsOnSecondRetry(t *testing.T) {
+	repo := &fakeGenRepo{}
+	badFirst := weekJSON(
+		recipeJSON("Mushroom Pasta", "vegetarian", 5, "mushroom", "pasta"),
+		recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
+		recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
+	)
+	badSecond := weekJSON(
+		recipeJSON("Creamy Mushrooms", "vegetarian", 5, "Fresh Mushrooms", "cream"),
+		recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
+		recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
+	)
+	svc := NewGenerationService(&fakeLLM{replies: []string{badFirst, badSecond, validWeek()}}, repo)
+
+	h := testHousehold()
+	h.DislikedIngredients = []string{"mushroom"}
+
+	got, err := svc.GenerateWeek(context.Background(), h)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if got.Recipes[0].Title != "Chicken Pasta" {
+		t.Fatalf("retry result not used: %+v", got.Recipes[0])
+	}
+	if repo.saved == nil {
+		t.Fatal("must persist after successful retry")
+	}
+}
+
 func TestGenerateWeekDislikePersistsFails(t *testing.T) {
 	repo := &fakeGenRepo{}
 	bad := weekJSON(
@@ -137,8 +166,8 @@ func TestGenerateWeekDislikePersistsFails(t *testing.T) {
 		recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
 		recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
 	)
-	// Both attempts violate (case-insensitive substring "mushroom").
-	svc := NewGenerationService(&fakeLLM{replies: []string{bad, bad}}, repo)
+	// All three attempts (initial + maxDislikeRetries) violate.
+	svc := NewGenerationService(&fakeLLM{replies: []string{bad, bad, bad}}, repo)
 
 	h := testHousehold()
 	h.DislikedIngredients = []string{"MUSHROOM"}
@@ -149,6 +178,60 @@ func TestGenerateWeekDislikePersistsFails(t *testing.T) {
 	}
 	if repo.saved != nil {
 		t.Fatal("must not persist on dislike violation")
+	}
+}
+
+func TestGenerateWeekDislikeInflection(t *testing.T) {
+	cases := []struct {
+		name             string
+		disliked         string
+		badIngredient    string
+		offendingRecipe  string
+		offendingProtein string
+	}{
+		{
+			name:             "russian inflection",
+			disliked:         "гриб",
+			badIngredient:    "грибы",
+			offendingRecipe:  "Грибной соус",
+			offendingProtein: "vegetarian",
+		},
+		{
+			name:             "finnish stem mutation",
+			disliked:         "sieni",
+			badIngredient:    "sienet",
+			offendingRecipe:  "Sienikastike",
+			offendingProtein: "vegetarian",
+		},
+		{
+			name:             "english diacritic",
+			disliked:         "creme fraiche",
+			badIngredient:    "Crème Fraîche",
+			offendingRecipe:  "Pasta in Cream",
+			offendingProtein: "vegetarian",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo := &fakeGenRepo{}
+			bad := weekJSON(
+				recipeJSON(c.offendingRecipe, c.offendingProtein, 5, c.badIngredient, "pasta"),
+				recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
+				recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
+			)
+			svc := NewGenerationService(&fakeLLM{replies: []string{bad, validWeek()}}, repo)
+
+			h := testHousehold()
+			h.DislikedIngredients = []string{c.disliked}
+
+			got, err := svc.GenerateWeek(context.Background(), h)
+			if err != nil {
+				t.Fatalf("generate: %v", err)
+			}
+			if got.Recipes[0].Title != "Chicken Pasta" {
+				t.Fatalf("retry not triggered for %s; title = %q", c.name, got.Recipes[0].Title)
+			}
+		})
 	}
 }
 

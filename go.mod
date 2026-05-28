@@ -7,6 +7,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/openai/openai-go v1.12.0
+	golang.org/x/text v0.31.0
 	modernc.org/sqlite v1.50.1
 )
 

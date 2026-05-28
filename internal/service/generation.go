@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"text/template"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/AntonKilk/cooking-helper/internal/domain"
 	"github.com/AntonKilk/cooking-helper/internal/llm"
 	"github.com/AntonKilk/cooking-helper/internal/llm/prompts"
+	"github.com/AntonKilk/cooking-helper/internal/shopping"
 )
 
 // Generation tuning. recentLimit bounds how much history feeds the prompt;
@@ -21,6 +23,9 @@ const (
 	generationTimeout = 45 * time.Second
 	maxGenTokens      = 4096
 	triggerDelimiter  = "---TRIGGER---"
+	// maxDislikeRetries bounds semantic retries when a disliked ingredient slips
+	// through. Total LLM attempts in the dislike path = 1 + maxDislikeRetries.
+	maxDislikeRetries = 2
 )
 
 // schemaHint is echoed into the repair prompt when the model's reply is not valid
@@ -102,19 +107,31 @@ func (g *GenerationService) GenerateWeek(ctx context.Context, h *domain.Househol
 		return nil, fmt.Errorf("generate week: %w", ErrGenerationInvalid)
 	}
 
-	// Dislikes are a hard constraint: on violation, retry once with the offending
-	// terms named, then fail closed.
-	if bad := dislikeViolations(week, h.DislikedIngredients); len(bad) > 0 {
-		retryTrigger := trigger + dislikeHint(bad)
+	// Dislikes are a hard constraint with defense-in-depth: post-validate every
+	// LLM reply, retry up to maxDislikeRetries times with escalating prompt
+	// accent, and emit a structured warn line per violation so frequency is
+	// observable from the logs. Fail closed once the budget is exhausted.
+	for attempt := 1; ; attempt++ {
+		bad := dislikeViolations(week, h.DislikedIngredients)
+		if len(bad) == 0 {
+			break
+		}
+		slog.Warn("dislike violation",
+			"attempt", attempt,
+			"terms", bad,
+			"household_id", h.ID,
+		)
+		if attempt > maxDislikeRetries {
+			return nil, fmt.Errorf("generate week: %w", ErrDislikeViolation)
+		}
+		final := attempt == maxDislikeRetries
+		retryTrigger := trigger + dislikeHint(bad, final)
 		week, err = g.complete(ctx, system, retryTrigger)
 		if err != nil {
 			return nil, fmt.Errorf("generate week (dislike retry): %w", err)
 		}
 		if len(week.Recipes) != 3 {
 			return nil, fmt.Errorf("generate week: %w", ErrGenerationInvalid)
-		}
-		if bad := dislikeViolations(week, h.DislikedIngredients); len(bad) > 0 {
-			return nil, fmt.Errorf("generate week: %w", ErrDislikeViolation)
 		}
 	}
 
@@ -193,30 +210,41 @@ func (g *GenerationService) loadPrompt(h *domain.HouseholdProfile) (system, trig
 // seven days for every person in the household.
 func targetPortions(f domain.FamilySize) int { return 7 * (f.Adults + f.Kids) }
 
-// dislikeViolations returns the disliked terms that appear in any ingredient name
-// across the week (case-insensitive substring match). Empty terms are ignored.
+// dislikeViolations returns the disliked terms that appear in any ingredient
+// name across the week, using inflection-tolerant matching from internal/shopping.
+// Empty terms are ignored.
 func dislikeViolations(week generatedWeek, disliked []string) []string {
 	var hits []string
 	for _, term := range disliked {
-		t := strings.ToLower(strings.TrimSpace(term))
-		if t == "" {
+		if strings.TrimSpace(term) == "" {
 			continue
 		}
 		for _, r := range week.Recipes {
+			matched := false
 			for _, ing := range r.Ingredients {
-				if strings.Contains(strings.ToLower(ing.Name), t) {
+				if shopping.ContainsTerm(ing.Name, term) {
 					hits = append(hits, term)
-					goto next
+					matched = true
+					break
 				}
 			}
+			if matched {
+				break
+			}
 		}
-	next:
 	}
 	return hits
 }
 
-// dislikeHint augments the trigger with the offending terms for the retry.
-func dislikeHint(bad []string) string {
+// dislikeHint augments the trigger with the offending terms for the retry. When
+// final is true (the last retry the budget allows), the wording is escalated.
+func dislikeHint(bad []string, final bool) string {
+	if final {
+		return "\n\nTHIS IS THE FINAL ATTEMPT. The previous replies used these FORBIDDEN ingredients: " +
+			strings.Join(bad, ", ") + ". You MUST exclude them entirely — not as a main ingredient, " +
+			"not as a garnish, not as a sauce component. If you cannot exclude them while satisfying " +
+			"the other constraints, choose three recipes built around entirely different proteins and produce."
+	}
 	return "\n\nThe previous attempt used these FORBIDDEN ingredients: " +
 		strings.Join(bad, ", ") + ". Regenerate all three recipes with these completely excluded."
 }
