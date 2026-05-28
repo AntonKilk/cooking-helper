@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,46 @@ import (
 	dict "github.com/AntonKilk/cooking-helper/i18n"
 	"github.com/AntonKilk/cooking-helper/internal/domain"
 	"github.com/AntonKilk/cooking-helper/internal/i18n"
+	"github.com/AntonKilk/cooking-helper/internal/repository"
 	"github.com/AntonKilk/cooking-helper/templates"
 )
+
+// stubRecipeReader serves canned recipes for the recipe handler tests. Missing
+// ids return repository.ErrNotFound (mirroring real Store.GetRecipe).
+type stubRecipeReader struct {
+	byID map[string]*domain.Recipe
+	err  error
+}
+
+func (s stubRecipeReader) GetRecipe(_ context.Context, id string) (*domain.Recipe, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	r, ok := s.byID[id]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return r, nil
+}
+
+// testRecipes returns the fixture map used by the shared test router so the
+// handler can resolve the ids used in the recipe_test.go cases.
+func testRecipes() map[string]*domain.Recipe {
+	return map[string]*domain.Recipe{
+		"abc123": {
+			ID:              "abc123",
+			Title:           "Test Recipe",
+			Description:     "A short description.",
+			CookTimeMinutes: 25,
+			Servings:        4,
+			Ingredients: []domain.Ingredient{
+				{Name: "flour", Amount: 250, Unit: "g"},
+				{Name: "salt", Amount: 0, Unit: "pinch"},
+			},
+			Steps: []string{"Mix the flour and salt.", "Bake for 20 minutes."},
+		},
+	}
+}
 
 func testBundle(t *testing.T) *i18n.Bundle {
 	t.Helper()
@@ -36,9 +75,10 @@ func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 	rd := &renderer{tmpl: testTemplates(t), bundle: testBundle(t)}
 	hh := &homeHandlers{rd: rd}
+	rh := &recipeHandlers{rd: rd, recipes: stubRecipeReader{byID: testRecipes()}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", hh.Home)
-	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
+	mux.HandleFunc("GET /recipe/{id}", rh.Show)
 	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(rd.bundle))
 	return languageMiddleware(rd.bundle, mux)

@@ -101,6 +101,117 @@ input,
   border-radius: 8px;
 }
 
+/* Fullscreen recipe view (CH-11 / F-4): override the centered max-width so the
+   ingredients + steps grid can use the full iPad screen on landscape. */
+main:has(> .recipe) { max-width: none; }
+
+.recipe { display: block; }
+
+.recipe__back {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 0 0.75rem;
+  margin-bottom: var(--space);
+  font-size: 1.125rem;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.recipe__title { font-size: 2.5rem; margin-bottom: 0.25em; }
+
+.recipe__meta {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5em;
+}
+
+.recipe__desc { font-size: 1.25rem; margin-bottom: var(--space); }
+
+.recipe__grid {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: 1fr;
+}
+
+@media (orientation: landscape) and (min-width: 900px) {
+  .recipe__grid { grid-template-columns: 1fr 1.4fr; }
+}
+
+.recipe__ingredient-list { list-style: none; padding: 0; margin: 0; }
+
+.recipe__ingredient {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.25rem;
+}
+
+.recipe__amount { font-weight: 600; }
+.recipe__unit { color: var(--text-muted); }
+.recipe__ingredient-name { flex: 1; }
+
+.recipe__step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: recipe-step;
+}
+
+.recipe-step {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 12px;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.recipe-step[aria-current="step"] {
+  background: var(--surface);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.recipe-step__body { flex: 1; }
+
+.recipe-step__label {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  margin: 0 0 0.25em;
+  color: var(--text-muted);
+}
+
+.recipe-step__text { margin: 0; font-size: 1.25rem; line-height: 1.5; }
+
+.recipe-step[data-done="true"] .recipe-step__text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.recipe-step__toggle {
+  min-height: var(--touch);
+  min-width: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.recipe-step[data-done="true"] .recipe-step__toggle {
+  background: var(--success);
+  color: var(--surface);
+  border-color: var(--success);
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #2B2118;

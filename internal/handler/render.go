@@ -14,9 +14,13 @@ import (
 func noopT(key string, _ ...any) string { return key }
 
 // ParseFuncMap is the FuncMap templates must be parsed with so that {{ t ... }}
-// resolves at parse time. render then rebinds t to a per-request translator.
+// and {{ add ... }} resolve at parse time. render then rebinds t to a
+// per-request translator; add stays stable.
 func ParseFuncMap() template.FuncMap {
-	return template.FuncMap{"t": noopT}
+	return template.FuncMap{
+		"t":   noopT,
+		"add": func(a, b int) int { return a + b },
+	}
 }
 
 // renderer executes templates with a request-scoped t() bound to the active
