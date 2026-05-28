@@ -281,7 +281,11 @@ func TestSwapRecipeInPlanRotatesIDs(t *testing.T) {
 	}
 
 	replacement := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "Replacement", Source: domain.SourceLLM}
-	if err := store.SwapRecipeInPlan(ctx, p.ID, recipes[1].ID, replacement); err != nil {
+	rebuilt := []domain.ShoppingListItem{
+		{Name: "tortilla", Amount: 8, Unit: "pcs", Category: domain.CategoryPantry},
+		{Name: "beef", Amount: 400, Unit: "g", Category: domain.CategoryMeatFish},
+	}
+	if err := store.SwapRecipeInPlan(ctx, p.ID, recipes[1].ID, replacement, rebuilt); err != nil {
 		t.Fatalf("swap: %v", err)
 	}
 	if replacement.ID == "" {
@@ -303,13 +307,19 @@ func TestSwapRecipeInPlanRotatesIDs(t *testing.T) {
 	if _, err := store.GetRecipe(ctx, recipes[1].ID); err != nil {
 		t.Fatalf("old recipe should remain: %v", err)
 	}
-	// Shopping list must have been invalidated.
+	// Shopping list must have been replaced with the rebuilt items.
 	items, err := store.listShoppingItems(ctx, p.ID)
 	if err != nil {
 		t.Fatalf("list items: %v", err)
 	}
-	if len(items) != 0 {
-		t.Fatalf("shopping items = %d, want 0 after swap", len(items))
+	if len(items) != 2 {
+		t.Fatalf("shopping items = %d, want 2 (rebuilt) after swap", len(items))
+	}
+	if items[0].Name != "tortilla" || items[1].Name != "beef" {
+		t.Fatalf("rebuilt shopping items = %+v, want [tortilla, beef]", items)
+	}
+	if items[0].Category != domain.CategoryPantry {
+		t.Fatalf("rebuilt item category = %q, want pantry", items[0].Category)
 	}
 }
 
@@ -327,11 +337,11 @@ func TestSwapRecipeInPlanNotFound(t *testing.T) {
 	replacement := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "X", Source: domain.SourceLLM}
 
 	// Unknown plan id.
-	if err := store.SwapRecipeInPlan(context.Background(), "missing-plan", p.RecipeIDs[0], replacement); !errors.Is(err, ErrNotFound) {
+	if err := store.SwapRecipeInPlan(context.Background(), "missing-plan", p.RecipeIDs[0], replacement, nil); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound (missing plan)", err)
 	}
 	// Plan exists, but oldRecipeID is not in it.
-	if err := store.SwapRecipeInPlan(context.Background(), p.ID, "missing-recipe", replacement); !errors.Is(err, ErrNotFound) {
+	if err := store.SwapRecipeInPlan(context.Background(), p.ID, "missing-recipe", replacement, nil); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound (missing old recipe)", err)
 	}
 }

@@ -98,10 +98,11 @@ func (s *Store) CurrentWeeklyPlan(ctx context.Context, householdID string) (*dom
 
 // SwapRecipeInPlan replaces oldRecipeID with newRecipe inside an existing plan
 // atomically. The old recipe row is kept (archive history); only the plan's
-// recipe_ids array rotates. The plan's shopping_list_item rows are cleared as a
-// forward-compatible invalidation hook for CH-12. Returns ErrNotFound when the
-// plan does not exist or oldRecipeID is not in its recipe_ids.
-func (s *Store) SwapRecipeInPlan(ctx context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe) error {
+// recipe_ids array rotates. The plan's shopping_list_item rows are replaced with
+// the rebuilt items so the list stays consistent with the new set of recipes.
+// Returns ErrNotFound when the plan does not exist or oldRecipeID is not in its
+// recipe_ids.
+func (s *Store) SwapRecipeInPlan(ctx context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe, items []domain.ShoppingListItem) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
@@ -142,7 +143,7 @@ func (s *Store) SwapRecipeInPlan(ctx context.Context, planID, oldRecipeID string
 			`DELETE FROM shopping_list_item WHERE weekly_plan_id = ?`, planID); err != nil {
 			return fmt.Errorf("clear shopping items: %w", err)
 		}
-		return nil
+		return insertShoppingItems(ctx, tx, planID, newRecipe.HouseholdID, time.Now().UTC(), items)
 	})
 }
 
@@ -177,17 +178,24 @@ func insertPlanWithItems(ctx context.Context, tx *sql.Tx, p *domain.WeeklyPlan) 
 		return fmt.Errorf("create weekly plan: %w", err)
 	}
 
+	return insertShoppingItems(ctx, tx, p.ID, p.HouseholdID, p.CreatedAt, p.ShoppingList)
+}
+
+// insertShoppingItems writes a plan's shopping-list items through tx, assigning an
+// ID to each item that lacks one. createdAt is stamped on every row. The caller
+// owns the transaction.
+func insertShoppingItems(ctx context.Context, tx *sql.Tx, planID, householdID string, createdAt time.Time, items []domain.ShoppingListItem) error {
 	const itemQ = `INSERT INTO shopping_list_item
 		(id, weekly_plan_id, household_id, name, amount, unit, category, checked, manually_removed, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	for i := range p.ShoppingList {
-		item := &p.ShoppingList[i]
+	for i := range items {
+		item := &items[i]
 		if item.ID == "" {
 			item.ID = uuid.NewString()
 		}
 		if _, err := tx.ExecContext(ctx, itemQ,
-			item.ID, p.ID, p.HouseholdID, item.Name, item.Amount, item.Unit,
-			string(item.Category), item.Checked, item.ManuallyRemoved, formatTime(p.CreatedAt)); err != nil {
+			item.ID, planID, householdID, item.Name, item.Amount, item.Unit,
+			string(item.Category), item.Checked, item.ManuallyRemoved, formatTime(createdAt)); err != nil {
 			return fmt.Errorf("create shopping item: %w", err)
 		}
 	}

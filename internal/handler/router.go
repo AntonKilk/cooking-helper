@@ -52,7 +52,7 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 		gh := &generateHandlers{
 			rd:         rd,
 			households: svc,
-			gen:        service.NewGenerationService(llmClient, store),
+			gen:        service.NewGenerationService(llmClient, store, service.NewShoppingBuilder(llmClient, store)),
 			recipes:    store,
 		}
 		mux.HandleFunc("POST /generate", gh.Generate)

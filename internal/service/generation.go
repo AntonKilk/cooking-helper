@@ -65,7 +65,14 @@ type generationRepo interface {
 	CurrentWeeklyPlan(ctx context.Context, householdID string) (*domain.WeeklyPlan, error)
 	ArchiveAndCreateWeek(ctx context.Context, previousPlanID string, p *domain.WeeklyPlan, recipes []domain.Recipe) error
 	RecipesByIDs(ctx context.Context, ids []string) ([]domain.Recipe, error)
-	SwapRecipeInPlan(ctx context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe) error
+	SwapRecipeInPlan(ctx context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe, items []domain.ShoppingListItem) error
+}
+
+// shoppingBuilder consolidates a week's recipes into a categorized shopping list.
+// *ShoppingBuilder satisfies it; kept as an interface so the generation service is
+// unit-testable with a fake.
+type shoppingBuilder interface {
+	Build(ctx context.Context, recipes []domain.Recipe, pantryBasics []string) ([]domain.ShoppingListItem, error)
 }
 
 // GeneratedWeek is what GenerateWeek returns to the handler: the persisted plan,
@@ -87,15 +94,18 @@ type SwappedRecipe struct {
 }
 
 // GenerationService turns a household profile into a weekly plan via the LLM,
-// enforcing the hard constraints and persisting the result atomically.
+// enforcing the hard constraints, building the consolidated shopping list, and
+// persisting the result atomically.
 type GenerationService struct {
-	client llm.Client
-	repo   generationRepo
+	client  llm.Client
+	repo    generationRepo
+	builder shoppingBuilder
 }
 
-// NewGenerationService returns a service backed by the given LLM client and repo.
-func NewGenerationService(client llm.Client, repo generationRepo) *GenerationService {
-	return &GenerationService{client: client, repo: repo}
+// NewGenerationService returns a service backed by the given LLM client, repo,
+// and shopping-list builder.
+func NewGenerationService(client llm.Client, repo generationRepo, builder shoppingBuilder) *GenerationService {
+	return &GenerationService{client: client, repo: repo, builder: builder}
 }
 
 // triggerData fills the variable half of the generate_week prompt.
@@ -179,6 +189,11 @@ func (g *GenerationService) GenerateWeek(ctx context.Context, h *domain.Househol
 
 	recipes, proteins := toDomainRecipes(week, h)
 	plan := &domain.WeeklyPlan{HouseholdID: h.ID, WeekStart: mondayOf(time.Now().UTC())}
+
+	plan.ShoppingList, err = g.builder.Build(ctx, recipes, h.PantryBasics)
+	if err != nil {
+		return nil, fmt.Errorf("generate week: %w", err)
+	}
 
 	previousID, err := g.currentPlanID(ctx, h.ID)
 	if err != nil {
@@ -281,10 +296,20 @@ func (g *GenerationService) SwapRecipe(ctx context.Context, h *domain.HouseholdP
 	}
 
 	newRecipe, protein := mapRecipe(reply.Recipe, h)
-	if err := g.repo.SwapRecipeInPlan(ctx, plan.ID, oldRecipeID, &newRecipe); err != nil {
+
+	// Rebuild the shopping list from the full new set (kept + replacement) so it
+	// stays consistent after the swap rather than being left empty.
+	allRecipes := append(append(make([]domain.Recipe, 0, len(kept)+1), kept...), newRecipe)
+	list, err := g.builder.Build(ctx, allRecipes, h.PantryBasics)
+	if err != nil {
+		return nil, fmt.Errorf("swap recipe: %w", err)
+	}
+
+	if err := g.repo.SwapRecipeInPlan(ctx, plan.ID, oldRecipeID, &newRecipe, list); err != nil {
 		return nil, fmt.Errorf("swap recipe: %w", err)
 	}
 	plan.RecipeIDs[idx] = newRecipe.ID
+	plan.ShoppingList = list
 
 	return &SwappedRecipe{Plan: plan, Recipe: newRecipe, Protein: protein}, nil
 }

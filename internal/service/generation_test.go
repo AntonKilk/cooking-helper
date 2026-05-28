@@ -41,6 +41,7 @@ type fakeGenRepo struct {
 	swapPlanID    string
 	swapOldID     string
 	swapNewRecipe *domain.Recipe
+	swapItems     []domain.ShoppingListItem
 }
 
 func (r *fakeGenRepo) RecentRecipes(_ context.Context, _ string, _ int) ([]domain.Recipe, error) {
@@ -80,14 +81,42 @@ func (r *fakeGenRepo) RecipesByIDs(_ context.Context, ids []string) ([]domain.Re
 	return out, nil
 }
 
-func (r *fakeGenRepo) SwapRecipeInPlan(_ context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe) error {
+func (r *fakeGenRepo) SwapRecipeInPlan(_ context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe, items []domain.ShoppingListItem) error {
 	r.swapPlanID = planID
 	r.swapOldID = oldRecipeID
 	if newRecipe.ID == "" {
 		newRecipe.ID = "rec-swap"
 	}
 	r.swapNewRecipe = newRecipe
+	r.swapItems = items
 	return nil
+}
+
+// fakeBuilder is a scriptable shopping-list builder. It records its last input so
+// swap/generation tests can assert which recipes + pantry were consolidated, and
+// returns canned items (defaulting to an empty list).
+type fakeBuilder struct {
+	items      []domain.ShoppingListItem
+	err        error
+	gotRecipes []domain.Recipe
+	gotPantry  []string
+	calls      int
+}
+
+func (b *fakeBuilder) Build(_ context.Context, recipes []domain.Recipe, pantry []string) ([]domain.ShoppingListItem, error) {
+	b.calls++
+	b.gotRecipes = recipes
+	b.gotPantry = pantry
+	if b.err != nil {
+		return nil, b.err
+	}
+	return b.items, nil
+}
+
+// newTestGenService wires a generation service with a default (empty) shopping
+// builder, so the existing tests need not care about list building.
+func newTestGenService(client llm.Client, repo generationRepo) *GenerationService {
+	return NewGenerationService(client, repo, &fakeBuilder{})
 }
 
 // recipeJSON builds one DTO recipe.
@@ -125,7 +154,7 @@ func validWeek() string {
 
 func TestGenerateWeekHappyPath(t *testing.T) {
 	repo := &fakeGenRepo{}
-	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{validWeek()}}, repo)
 
 	got, err := svc.GenerateWeek(context.Background(), testHousehold())
 	if err != nil {
@@ -155,7 +184,7 @@ func TestGenerateWeekDislikeRetrySucceeds(t *testing.T) {
 		recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
 		recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
 	)
-	svc := NewGenerationService(&fakeLLM{replies: []string{bad, validWeek()}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{bad, validWeek()}}, repo)
 
 	h := testHousehold()
 	h.DislikedIngredients = []string{"mushroom"}
@@ -181,7 +210,7 @@ func TestGenerateWeekDislikeRetrySucceedsOnSecondRetry(t *testing.T) {
 		recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
 		recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
 	)
-	svc := NewGenerationService(&fakeLLM{replies: []string{badFirst, badSecond, validWeek()}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{badFirst, badSecond, validWeek()}}, repo)
 
 	h := testHousehold()
 	h.DislikedIngredients = []string{"mushroom"}
@@ -206,7 +235,7 @@ func TestGenerateWeekDislikePersistsFails(t *testing.T) {
 		recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
 	)
 	// All three attempts (initial + maxDislikeRetries) violate.
-	svc := NewGenerationService(&fakeLLM{replies: []string{bad, bad, bad}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{bad, bad, bad}}, repo)
 
 	h := testHousehold()
 	h.DislikedIngredients = []string{"MUSHROOM"}
@@ -258,7 +287,7 @@ func TestGenerateWeekDislikeInflection(t *testing.T) {
 				recipeJSON("Beef Tacos", "red_meat", 5, "beef", "tortilla"),
 				recipeJSON("Salmon Bowl", "fish", 5, "salmon", "rice"),
 			)
-			svc := NewGenerationService(&fakeLLM{replies: []string{bad, validWeek()}}, repo)
+			svc := newTestGenService(&fakeLLM{replies: []string{bad, validWeek()}}, repo)
 
 			h := testHousehold()
 			h.DislikedIngredients = []string{c.disliked}
@@ -309,7 +338,7 @@ func TestGenerateWeekValidationErrors(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			repo := &fakeGenRepo{}
-			svc := NewGenerationService(&fakeLLM{replies: []string{c.reply}}, repo)
+			svc := newTestGenService(&fakeLLM{replies: []string{c.reply}}, repo)
 			_, err := svc.GenerateWeek(context.Background(), testHousehold())
 			if !errors.Is(err, c.want) {
 				t.Fatalf("err = %v, want %v", err, c.want)
@@ -328,7 +357,7 @@ func TestGenerateWeekIncludesHistoryInPrompt(t *testing.T) {
 		},
 	}
 	llmClient := &capturingLLM{reply: validWeek()}
-	svc := NewGenerationService(llmClient, repo)
+	svc := newTestGenService(llmClient, repo)
 
 	h := testHousehold()
 	h.DislikedIngredients = []string{"olives"}
@@ -386,7 +415,7 @@ func TestGenerateWeekArchivesPreviousPlan(t *testing.T) {
 	repo := &fakeGenRepo{
 		currentPlan: &domain.WeeklyPlan{ID: "prev-plan-99"},
 	}
-	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{validWeek()}}, repo)
 
 	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err != nil {
 		t.Fatalf("generate: %v", err)
@@ -398,7 +427,7 @@ func TestGenerateWeekArchivesPreviousPlan(t *testing.T) {
 
 func TestGenerateWeekNoPreviousPlan(t *testing.T) {
 	repo := &fakeGenRepo{} // currentPlan = nil → repository.ErrNotFound
-	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{validWeek()}}, repo)
 
 	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err != nil {
 		t.Fatalf("generate: %v", err)
@@ -409,7 +438,7 @@ func TestGenerateWeekNoPreviousPlan(t *testing.T) {
 }
 
 func TestCurrentPlanNoActiveReturnsNil(t *testing.T) {
-	svc := NewGenerationService(&fakeLLM{replies: []string{""}}, &fakeGenRepo{})
+	svc := newTestGenService(&fakeLLM{replies: []string{""}}, &fakeGenRepo{})
 	got, err := svc.CurrentPlan(context.Background(), "hh-1")
 	if err != nil {
 		t.Fatalf("current plan: %v", err)
@@ -453,7 +482,7 @@ func singleRecipeJSON(title, protein string, servings int, ingredients ...string
 func TestSwapRecipeHappyPath(t *testing.T) {
 	h, plan, repo := swapKeptHousehold(t)
 	reply := singleRecipeJSON("Beef Tacos", "red_meat", 4, "beef", "tortilla") // target = 14 - (5+5) = 4
-	svc := NewGenerationService(&fakeLLM{replies: []string{reply}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{reply}}, repo)
 
 	got, err := svc.SwapRecipe(context.Background(), h, plan, "old-B")
 	if err != nil {
@@ -475,7 +504,7 @@ func TestSwapRecipeHappyPath(t *testing.T) {
 
 func TestSwapRecipeUnknownOldID(t *testing.T) {
 	h, plan, repo := swapKeptHousehold(t)
-	svc := NewGenerationService(&fakeLLM{replies: []string{""}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{""}}, repo)
 
 	if _, err := svc.SwapRecipe(context.Background(), h, plan, "nope"); !errors.Is(err, ErrGenerationInvalid) {
 		t.Fatalf("err = %v, want ErrGenerationInvalid", err)
@@ -491,7 +520,7 @@ func TestSwapRecipeDislikeRetrySucceeds(t *testing.T) {
 	bad := singleRecipeJSON("Mushroom Bowl", "vegetarian", 4, "Fresh Mushrooms", "rice")
 	good := singleRecipeJSON("Beef Tacos", "red_meat", 4, "beef", "tortilla")
 	llmClient := &capturingLLM{replies: []string{bad, good}}
-	svc := NewGenerationService(llmClient, repo)
+	svc := newTestGenService(llmClient, repo)
 
 	got, err := svc.SwapRecipe(context.Background(), h, plan, "old-B")
 	if err != nil {
@@ -509,7 +538,7 @@ func TestSwapRecipeDislikePersistsFails(t *testing.T) {
 	h, plan, repo := swapKeptHousehold(t)
 	h.DislikedIngredients = []string{"MUSHROOM"}
 	bad := singleRecipeJSON("Mushroom Bowl", "vegetarian", 4, "Fresh Mushrooms", "rice")
-	svc := NewGenerationService(&fakeLLM{replies: []string{bad, bad}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{bad, bad}}, repo)
 
 	if _, err := svc.SwapRecipe(context.Background(), h, plan, "old-B"); !errors.Is(err, ErrDislikeViolation) {
 		t.Fatalf("err = %v, want ErrDislikeViolation", err)
@@ -523,7 +552,7 @@ func TestSwapRecipePortionsShort(t *testing.T) {
 	h, plan, repo := swapKeptHousehold(t)
 	// target = 14 - 10 = 4 ; reply returns 2 — too few.
 	reply := singleRecipeJSON("Tiny", "red_meat", 2, "beef")
-	svc := NewGenerationService(&fakeLLM{replies: []string{reply}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{reply}}, repo)
 
 	if _, err := svc.SwapRecipe(context.Background(), h, plan, "old-B"); !errors.Is(err, ErrPortionsShort) {
 		t.Fatalf("err = %v, want ErrPortionsShort", err)
@@ -541,7 +570,7 @@ func TestSwapRecipeProteinVariety(t *testing.T) {
 	plan := &domain.WeeklyPlan{ID: "plan-77", HouseholdID: h.ID, RecipeIDs: []string{"keep-A", "old-B", "keep-C"}}
 	repo := &fakeGenRepo{keptByID: kept}
 	reply := singleRecipeJSON("Chicken Curry", "poultry", 4, "chicken")
-	svc := NewGenerationService(&fakeLLM{replies: []string{reply}}, repo)
+	svc := newTestGenService(&fakeLLM{replies: []string{reply}}, repo)
 
 	if _, err := svc.SwapRecipe(context.Background(), h, plan, "old-B"); !errors.Is(err, ErrProteinVariety) {
 		t.Fatalf("err = %v, want ErrProteinVariety", err)
@@ -551,7 +580,7 @@ func TestSwapRecipeProteinVariety(t *testing.T) {
 func TestSwapRecipeKeptContextInPrompt(t *testing.T) {
 	h, plan, repo := swapKeptHousehold(t)
 	llmClient := &capturingLLM{reply: singleRecipeJSON("Beef Tacos", "red_meat", 4, "beef", "tortilla")}
-	svc := NewGenerationService(llmClient, repo)
+	svc := newTestGenService(llmClient, repo)
 
 	if _, err := svc.SwapRecipe(context.Background(), h, plan, "old-B"); err != nil {
 		t.Fatalf("swap: %v", err)
@@ -569,6 +598,80 @@ func TestSwapRecipeKeptContextInPrompt(t *testing.T) {
 	// Target servings = 14 - (5+5) = 4 must appear in the trigger.
 	if !strings.Contains(llmClient.lastPrompt, "at least 4") {
 		t.Errorf("trigger missing target servings:\n%s", llmClient.lastPrompt)
+	}
+}
+
+func TestGenerateWeekAttachesShoppingList(t *testing.T) {
+	repo := &fakeGenRepo{}
+	builder := &fakeBuilder{items: []domain.ShoppingListItem{
+		{Name: "chicken", Amount: 500, Unit: "g", Category: domain.CategoryMeatFish},
+		{Name: "pasta", Amount: 400, Unit: "g", Category: domain.CategoryPantry},
+	}}
+	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo, builder)
+
+	h := testHousehold()
+	h.PantryBasics = []string{"salt"}
+
+	got, err := svc.GenerateWeek(context.Background(), h)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if builder.calls != 1 {
+		t.Fatalf("builder calls = %d, want 1", builder.calls)
+	}
+	if len(builder.gotRecipes) != 3 {
+		t.Fatalf("builder got %d recipes, want 3", len(builder.gotRecipes))
+	}
+	if !equalStrings(builder.gotPantry, []string{"salt"}) {
+		t.Fatalf("builder pantry = %v, want [salt]", builder.gotPantry)
+	}
+	if len(got.Plan.ShoppingList) != 2 || got.Plan.ShoppingList[0].Name != "chicken" {
+		t.Fatalf("plan shopping list not attached: %+v", got.Plan.ShoppingList)
+	}
+	if repo.saved == nil || len(repo.saved.ShoppingList) != 2 {
+		t.Fatal("shopping list was not persisted with the plan")
+	}
+}
+
+func TestGenerateWeekBuilderErrorFails(t *testing.T) {
+	repo := &fakeGenRepo{}
+	builder := &fakeBuilder{err: errors.New("categorize boom")}
+	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo, builder)
+
+	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err == nil {
+		t.Fatal("expected error when builder fails")
+	}
+	if repo.saved != nil {
+		t.Fatal("must not persist when shopping-list build fails")
+	}
+}
+
+func TestSwapRecipeRebuildsShoppingList(t *testing.T) {
+	h, plan, repo := swapKeptHousehold(t)
+	h.PantryBasics = []string{"oil"}
+	builder := &fakeBuilder{items: []domain.ShoppingListItem{
+		{Name: "beef", Amount: 1, Unit: "pcs", Category: domain.CategoryMeatFish},
+	}}
+	reply := singleRecipeJSON("Beef Tacos", "red_meat", 4, "beef", "tortilla")
+	svc := NewGenerationService(&fakeLLM{replies: []string{reply}}, repo, builder)
+
+	got, err := svc.SwapRecipe(context.Background(), h, plan, "old-B")
+	if err != nil {
+		t.Fatalf("swap: %v", err)
+	}
+	// Builder must consolidate the full new set: the two kept recipes + replacement.
+	if len(builder.gotRecipes) != 3 {
+		t.Fatalf("builder got %d recipes, want 3 (2 kept + new)", len(builder.gotRecipes))
+	}
+	if !equalStrings(builder.gotPantry, []string{"oil"}) {
+		t.Fatalf("builder pantry = %v, want [oil]", builder.gotPantry)
+	}
+	// The rebuilt list must reach the repository and the returned plan.
+	if len(repo.swapItems) != 1 || repo.swapItems[0].Name != "beef" {
+		t.Fatalf("repo swap items = %+v, want rebuilt list", repo.swapItems)
+	}
+	if len(got.Plan.ShoppingList) != 1 || got.Plan.ShoppingList[0].Name != "beef" {
+		t.Fatalf("returned plan shopping list = %+v, want rebuilt list", got.Plan.ShoppingList)
 	}
 }
 
