@@ -48,8 +48,14 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))
 
 	if canGenerate {
-		gh := &generateHandlers{rd: rd, households: svc, gen: service.NewGenerationService(llmClient, store)}
+		gh := &generateHandlers{
+			rd:         rd,
+			households: svc,
+			gen:        service.NewGenerationService(llmClient, store),
+			recipes:    store,
+		}
 		mux.HandleFunc("POST /generate", gh.Generate)
+		mux.HandleFunc("POST /generate/swap/{recipeID}", gh.Swap)
 	}
 
 	return requestLogger(logger, languageMiddleware(bundle, mux))

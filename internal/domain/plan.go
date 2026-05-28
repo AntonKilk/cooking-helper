@@ -3,7 +3,9 @@ package domain
 import "time"
 
 // WeeklyPlan is a generated menu: three recipes portioned for a week of eating,
-// plus the consolidated shopping list derived from them.
+// plus the consolidated shopping list derived from them. ArchivedAt is nil for
+// the household's currently-active plan; a full regeneration stamps the old
+// plan's ArchivedAt and inserts a new active one, so history is never lost.
 type WeeklyPlan struct {
 	ID           string
 	HouseholdID  string
@@ -11,6 +13,7 @@ type WeeklyPlan struct {
 	RecipeIDs    []string
 	ShoppingList []ShoppingListItem
 	CreatedAt    time.Time
+	ArchivedAt   *time.Time
 }
 
 // ShoppingListItem is one consolidated, store-categorized line of a plan's

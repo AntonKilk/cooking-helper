@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -149,6 +150,55 @@ func (s *Store) RecentRecipes(ctx context.Context, householdID string, limit int
 		return nil, fmt.Errorf("iterate recent recipes: %w", err)
 	}
 	return recipes, nil
+}
+
+// RecipesByIDs loads the recipes whose IDs are in ids, preserving the requested
+// order. Returns ErrNotFound if any id is missing — callers (e.g. the swap
+// service loading the two kept recipes) need all of them to proceed. An empty
+// input yields an empty slice.
+func (s *Store) RecipesByIDs(ctx context.Context, ids []string) ([]domain.Recipe, error) {
+	if len(ids) == 0 {
+		return []domain.Recipe{}, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1]
+	q := `SELECT ` + recipeColumns + ` FROM recipe WHERE id IN (` + placeholders + `)`
+
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("recipes by ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	byID := make(map[string]domain.Recipe, len(ids))
+	for rows.Next() {
+		r, err := scanRecipe(rows)
+		if err != nil {
+			return nil, err
+		}
+		byID[r.ID] = *r
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recipes by ids: %w", err)
+	}
+
+	out := make([]domain.Recipe, len(ids))
+	for i, id := range ids {
+		r, ok := byID[id]
+		if !ok {
+			return nil, ErrNotFound
+		}
+		out[i] = r
+	}
+	return out, nil
 }
 
 // UpdateRecipe overwrites a recipe (including feedback) and bumps updated_at.

@@ -8,6 +8,8 @@
   "home.generating": "Готовим вашу неделю…",
   "home.generate_disabled": "Генерация сейчас недоступна.",
   "home.week_heading": "Ваши три рецепта",
+  "home.regenerate_all": "Перегенерировать всё",
+  "recipe.replace": "Заменить",
   "settings.heading": "Настройки",
   "recipe.heading": "Рецепт",
   "recipe.not_found": "Рецепт не найден.",

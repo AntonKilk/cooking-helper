@@ -157,6 +157,60 @@ func TestRecentRecipesScopedToHousehold(t *testing.T) {
 	}
 }
 
+func TestRecipesByIDsPreservesOrder(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	titles := []string{"a", "b", "c"}
+	created := make([]*domain.Recipe, len(titles))
+	for i, title := range titles {
+		r := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: title, Source: domain.SourceLLM}
+		if err := store.CreateRecipe(ctx, r); err != nil {
+			t.Fatalf("create %s: %v", title, err)
+		}
+		created[i] = r
+	}
+
+	// Request in a non-insertion order — result must preserve the request order.
+	got, err := store.RecipesByIDs(ctx, []string{created[2].ID, created[0].ID, created[1].ID})
+	if err != nil {
+		t.Fatalf("recipes by ids: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("len = %d, want 3", len(got))
+	}
+	if got[0].Title != "c" || got[1].Title != "a" || got[2].Title != "b" {
+		t.Fatalf("order = [%s,%s,%s], want [c,a,b]", got[0].Title, got[1].Title, got[2].Title)
+	}
+}
+
+func TestRecipesByIDsMissingReturnsNotFound(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	r := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: "only", Source: domain.SourceLLM}
+	if err := store.CreateRecipe(ctx, r); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if _, err := store.RecipesByIDs(ctx, []string{r.ID, "missing-id"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestRecipesByIDsEmpty(t *testing.T) {
+	store := newTestStore(t)
+	got, err := store.RecipesByIDs(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("recipes by ids: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("len = %d, want 0", len(got))
+	}
+}
+
 func TestRecipeCascadeOnHouseholdDelete(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
