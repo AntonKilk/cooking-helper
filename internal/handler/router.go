@@ -34,11 +34,12 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	ph := &profileHandlers{rd: rd, bundle: bundle, svc: svc}
 	canGenerate := llmClient != nil
 	hh := &homeHandlers{rd: rd, canGenerate: canGenerate}
+	rh := &recipeHandlers{rd: rd, recipes: store}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
 	mux.HandleFunc("GET /{$}", hh.Home)
-	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
+	mux.HandleFunc("GET /recipe/{id}", rh.Show)
 	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
 	mux.HandleFunc("GET /settings/profile", ph.Show)

@@ -10,6 +10,7 @@
     {{ template "recipe/content" . }}
   </main>
   <script src="/static/js/htmx.min.js"></script>
+  <script src="/static/js/cooking-steps.js" defer></script>
   {{ template "sw-register" . }}
 </body>
 </html>
@@ -20,7 +21,43 @@
   <h1>{{ t "recipe.heading" }}</h1>
   <p role="alert">{{ t "recipe.not_found" }}</p>
   {{- else }}
-  <h1>{{ t "recipe.heading" }}</h1>
-  <p>{{ .ID }}</p>
+  <article class="recipe">
+    <a href="/" hx-get="/" hx-target="#content" hx-push-url="true" class="recipe__back">{{ t "recipe.back" }}</a>
+    <h1 class="recipe__title">{{ .Recipe.Title }}</h1>
+    <p class="recipe__meta">{{ t "recipe.cook_time" .Recipe.CookTime }} · {{ t "recipe.servings" .Recipe.Servings }}</p>
+    {{- if .Recipe.Description }}
+    <p class="recipe__desc">{{ .Recipe.Description }}</p>
+    {{- end }}
+
+    <div class="recipe__grid">
+      <section class="recipe__ingredients" aria-labelledby="recipe-ingredients-heading">
+        <h2 id="recipe-ingredients-heading">{{ t "recipe.ingredients_heading" }}</h2>
+        <ul class="recipe__ingredient-list">
+          {{- range .Recipe.Ingredients }}
+          <li class="recipe__ingredient">
+            {{- if .Amount }}<span class="recipe__amount">{{ .Amount }}</span>{{ end }}
+            {{- if .Unit }} <span class="recipe__unit">{{ .Unit }}</span>{{ end }}
+            <span class="recipe__ingredient-name">{{ .Name }}</span>
+          </li>
+          {{- end }}
+        </ul>
+      </section>
+
+      <section class="recipe__steps" aria-labelledby="recipe-steps-heading">
+        <h2 id="recipe-steps-heading">{{ t "recipe.steps_heading" }}</h2>
+        <ol class="recipe__step-list" data-recipe-id="{{ .Recipe.ID }}">
+          {{- range $i, $step := .Recipe.Steps }}
+          <li class="recipe-step" data-step-index="{{ $i }}">
+            <div class="recipe-step__body">
+              <p class="recipe-step__label">{{ t "recipe.step_label" (add $i 1) }}</p>
+              <p class="recipe-step__text">{{ $step }}</p>
+            </div>
+            <button type="button" class="recipe-step__toggle" aria-pressed="false">{{ t "recipe.mark_done" }}</button>
+          </li>
+          {{- end }}
+        </ol>
+      </section>
+    </div>
+  </article>
   {{- end }}
 {{- end -}}
