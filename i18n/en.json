@@ -8,6 +8,8 @@
   "home.generating": "Cooking up your week…",
   "home.generate_disabled": "Generation is not available right now.",
   "home.week_heading": "Your three recipes",
+  "home.regenerate_all": "Regenerate all",
+  "recipe.replace": "Replace",
   "settings.heading": "Settings",
   "recipe.heading": "Recipe",
   "recipe.not_found": "Recipe not found.",

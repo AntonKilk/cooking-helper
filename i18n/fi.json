@@ -8,6 +8,8 @@
   "home.generating": "Kokkaillaan viikkoasi…",
   "home.generate_disabled": "Luonti ei ole juuri nyt käytettävissä.",
   "home.week_heading": "Kolme reseptiäsi",
+  "home.regenerate_all": "Luo kaikki uudelleen",
+  "recipe.replace": "Vaihda",
   "settings.heading": "Asetukset",
   "recipe.heading": "Resepti",
   "recipe.not_found": "Reseptiä ei löytynyt.",

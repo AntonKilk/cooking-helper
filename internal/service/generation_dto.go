@@ -24,3 +24,8 @@ type generatedRecipe struct {
 type generatedWeek struct {
 	Recipes []generatedRecipe `json:"recipes"`
 }
+
+// generatedSwap is the single-recipe reply for a swap call.
+type generatedSwap struct {
+	Recipe generatedRecipe `json:"recipe"`
+}
