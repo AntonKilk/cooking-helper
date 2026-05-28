@@ -126,9 +126,13 @@ Never write code for an integration without completing this checklist:
 This applies directly to the **LLM provider API** — Anthropic (`ANTHROPIC_API_KEY`)
 or OpenAI (`OPENAI_API_KEY`), key required, provisioned via env — and to the
 **Apple Reminders / Shortcuts** export in Phase 2. Note: the web sandbox's egress
-allowlist may not include every provider host (e.g. `api.openai.com` is currently
-blocked — `x-deny-reason: host_not_allowed`); live calls to a blocked host must be
-deferred to a networked host (Mac mini / dev machine).
+allowlist **varies by session** — a provider host may be blocked
+(`x-deny-reason: host_not_allowed`) in one run and reachable in another (CH-8 ran a
+live OpenAI E2E in-sandbox with `OPENAI_API_KEY` set). **Re-check reachability at run
+time** (a quick probe, or the live attempt itself) before deciding to defer — do NOT
+skip a verifiable live LLM test on the strength of this note alone. Only defer to a
+networked host (Mac mini / dev machine) once you've confirmed the host is actually
+blocked or the key is absent in *this* run.
 
 ### Third-party libraries
 Before proposing a library: check it's actively maintained, compatible with the Go
@@ -198,6 +202,13 @@ Go structs.
 ### Structured logging (`log/slog`, JSON to stdout)
 - Every entry includes timestamp, level, message, and a **`request_id`** (UUID) propagated
   across log lines and into LLM calls.
+- **Propagate `request_id` via `context.Context`, not via handler-package internals.**
+  The handler generates the UUID at the request boundary and stores it on the context
+  through a *neutral* shared package (e.g. `internal/reqid` with `WithID(ctx, id)` /
+  `FromContext(ctx)`). Services and the `internal/llm` client read it back from `ctx`.
+  Do NOT leave `Request.RequestID` empty to dodge a service→handler import — that
+  reverse dependency is the thing the neutral package exists to avoid; reading the
+  request_id from `ctx` keeps the dependency direction correct *and* satisfies this rule.
 - Log at boundaries: incoming request, outgoing LLM/DB call, error.
 - Do NOT log secrets, prompt contents, or personal data.
 
