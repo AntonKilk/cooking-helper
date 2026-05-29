@@ -16,16 +16,20 @@ import (
 	"github.com/AntonKilk/cooking-helper/internal/shopping"
 )
 
-// Generation tuning. recentLimit bounds how much history feeds the prompt;
-// generationTimeout caps the whole tap-to-result path (the provider client also
-// applies its own per-call timeout); maxGenTokens / maxSwapTokens cap output
-// size for week vs. single-recipe generation.
+// Generation tuning. defaultRecentLimit bounds how much history feeds the prompt
+// (overridable via WithRecentLimit); generationTimeout caps the whole
+// tap-to-result path (the provider client also applies its own per-call timeout);
+// maxGenTokens / maxSwapTokens cap output size for week vs. single-recipe
+// generation.
 const (
-	recentLimit       = 10
-	generationTimeout = 45 * time.Second
-	maxGenTokens      = 4096
-	maxSwapTokens     = 2048
-	triggerDelimiter  = "---TRIGGER---"
+	// defaultRecentLimit is how many recent recipes feed the prompt when no
+	// explicit limit is configured (CH-17: configurable via WithRecentLimit,
+	// wired from the FEEDBACK_HISTORY_LIMIT env var — never via the UI).
+	defaultRecentLimit = 20
+	generationTimeout  = 45 * time.Second
+	maxGenTokens       = 4096
+	maxSwapTokens      = 2048
+	triggerDelimiter   = "---TRIGGER---"
 	// maxDislikeRetries bounds semantic retries when a disliked ingredient slips
 	// through. Total LLM attempts in the dislike path = 1 + maxDislikeRetries.
 	maxDislikeRetries = 2
@@ -97,15 +101,40 @@ type SwappedRecipe struct {
 // enforcing the hard constraints, building the consolidated shopping list, and
 // persisting the result atomically.
 type GenerationService struct {
-	client  llm.Client
-	repo    generationRepo
-	builder shoppingBuilder
+	client      llm.Client
+	repo        generationRepo
+	builder     shoppingBuilder
+	recentLimit int
+}
+
+// GenOption configures a GenerationService at construction.
+type GenOption func(*GenerationService)
+
+// WithRecentLimit sets how many recent recipes feed the generation/swap prompt.
+// Non-positive values are ignored, leaving the default in place. This is the
+// hook the server uses to wire the FEEDBACK_HISTORY_LIMIT env var.
+func WithRecentLimit(n int) GenOption {
+	return func(g *GenerationService) {
+		if n > 0 {
+			g.recentLimit = n
+		}
+	}
 }
 
 // NewGenerationService returns a service backed by the given LLM client, repo,
-// and shopping-list builder.
-func NewGenerationService(client llm.Client, repo generationRepo, builder shoppingBuilder) *GenerationService {
-	return &GenerationService{client: client, repo: repo, builder: builder}
+// and shopping-list builder. The recent-history depth defaults to
+// defaultRecentLimit and can be overridden with WithRecentLimit.
+func NewGenerationService(client llm.Client, repo generationRepo, builder shoppingBuilder, opts ...GenOption) *GenerationService {
+	g := &GenerationService{
+		client:      client,
+		repo:        repo,
+		builder:     builder,
+		recentLimit: defaultRecentLimit,
+	}
+	for _, opt := range opts {
+		opt(g)
+	}
+	return g
 }
 
 // triggerData fills the variable half of the generate_week prompt.
@@ -340,7 +369,7 @@ func (g *GenerationService) loadSwapPrompt(h *domain.HouseholdProfile, kept []do
 		return "", "", fmt.Errorf("prompt missing %q delimiter", triggerDelimiter)
 	}
 
-	recent, err := g.repo.RecentRecipes(context.Background(), h.ID, recentLimit)
+	recent, err := g.repo.RecentRecipes(context.Background(), h.ID, g.recentLimit)
 	if err != nil {
 		return "", "", err
 	}
@@ -358,7 +387,7 @@ func (g *GenerationService) loadSwapPrompt(h *domain.HouseholdProfile, kept []do
 		Disliked:       h.DislikedIngredients,
 		Pantry:         h.PantryBasics,
 		Kept:           formatKept(kept),
-		Recent:         formatRecent(recent),
+		Recent:         serializeRecent(recent),
 	}
 	if err := tmpl.Execute(&sb, data); err != nil {
 		return "", "", fmt.Errorf("render swap trigger template: %w", err)
@@ -405,7 +434,7 @@ func (g *GenerationService) loadPrompt(h *domain.HouseholdProfile) (system, trig
 		return "", "", fmt.Errorf("prompt missing %q delimiter", triggerDelimiter)
 	}
 
-	recent, err := g.repo.RecentRecipes(context.Background(), h.ID, recentLimit)
+	recent, err := g.repo.RecentRecipes(context.Background(), h.ID, g.recentLimit)
 	if err != nil {
 		return "", "", err
 	}
@@ -422,7 +451,7 @@ func (g *GenerationService) loadPrompt(h *domain.HouseholdProfile) (system, trig
 		TargetPortions: targetPortions(h.FamilySize),
 		Disliked:       h.DislikedIngredients,
 		Pantry:         h.PantryBasics,
-		Recent:         formatRecent(recent),
+		Recent:         serializeRecent(recent),
 	}
 	if err := tmpl.Execute(&sb, data); err != nil {
 		return "", "", fmt.Errorf("render trigger template: %w", err)
@@ -496,37 +525,6 @@ func hasProteinVariety(week generatedWeek) bool {
 		}
 	}
 	return len(seen) >= 2
-}
-
-// formatRecent turns recent recipes into prompt lines with a compact feedback tag,
-// e.g. "Creamy Pasta [liked, cook again]".
-func formatRecent(recipes []domain.Recipe) []string {
-	lines := make([]string, 0, len(recipes))
-	for _, r := range recipes {
-		line := r.Title
-		if tag := feedbackTag(r.Feedback); tag != "" {
-			line += " [" + tag + "]"
-		}
-		lines = append(lines, line)
-	}
-	return lines
-}
-
-func feedbackTag(f *domain.Feedback) string {
-	if f == nil {
-		return ""
-	}
-	var parts []string
-	if f.Liked {
-		parts = append(parts, "liked")
-	}
-	if f.Disliked {
-		parts = append(parts, "disliked")
-	}
-	if f.CookAgain {
-		parts = append(parts, "cook again")
-	}
-	return strings.Join(parts, ", ")
 }
 
 // toDomainRecipes maps the LLM DTO into persistable recipes (tagged llm, in the

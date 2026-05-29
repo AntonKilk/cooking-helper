@@ -21,13 +21,35 @@ type contextKey string
 // requestIDKey is the context key under which the per-request ID is stored.
 const requestIDKey contextKey = "request_id"
 
+// routerConfig holds optional, server-tuned settings applied via RouterOption.
+// feedbackHistoryLimit ≤ 0 means "leave the generation service's default in
+// place".
+type routerConfig struct {
+	feedbackHistoryLimit int
+}
+
+// RouterOption configures optional NewRouter behavior.
+type RouterOption func(*routerConfig)
+
+// WithFeedbackHistoryLimit sets how many recent recipes (with feedback) feed the
+// weekly-generation prompt. Wired from the FEEDBACK_HISTORY_LIMIT env var at the
+// server edge; non-positive values leave the generation default in place.
+func WithFeedbackHistoryLimit(n int) RouterOption {
+	return func(c *routerConfig) { c.feedbackHistoryLimit = n }
+}
+
 // NewRouter builds the application's HTTP handler: the route table wrapped in
 // language-resolution, request-ID, and structured-logging middleware. The db
 // backs the readiness probe; the bundle and tmpl drive localized rendering;
 // staticFS serves the embedded front-end assets, manifest, and Service Worker.
 // llmClient enables weekly generation; when nil, the feature is disabled and the
 // home screen renders the button inert (the rest of the app works unchanged).
-func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template, staticFS fs.FS, llmClient llm.Client) http.Handler {
+func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *template.Template, staticFS fs.FS, llmClient llm.Client, opts ...RouterOption) http.Handler {
+	var cfg routerConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	rd := &renderer{tmpl: tmpl, bundle: bundle}
 	store := repository.New(db)
 	svc := service.NewHouseholdService(store)
@@ -63,10 +85,14 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))
 
 	if canGenerate {
+		var genOpts []service.GenOption
+		if cfg.feedbackHistoryLimit > 0 {
+			genOpts = append(genOpts, service.WithRecentLimit(cfg.feedbackHistoryLimit))
+		}
 		gh := &generateHandlers{
 			rd:         rd,
 			households: svc,
-			gen:        service.NewGenerationService(llmClient, store, service.NewShoppingBuilder(llmClient, store)),
+			gen:        service.NewGenerationService(llmClient, store, service.NewShoppingBuilder(llmClient, store), genOpts...),
 			recipes:    store,
 		}
 		mux.HandleFunc("POST /generate", gh.Generate)

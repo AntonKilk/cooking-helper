@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -26,9 +27,10 @@ import (
 )
 
 const (
-	defaultPort     = "8080"
-	defaultDBPath   = "data/cooking.db"
-	shutdownTimeout = 10 * time.Second
+	defaultPort                 = "8080"
+	defaultDBPath               = "data/cooking.db"
+	defaultFeedbackHistoryLimit = 20
+	shutdownTimeout             = 10 * time.Second
 )
 
 func main() {
@@ -78,9 +80,11 @@ func run(logger *slog.Logger) error {
 
 	llmClient := newLLMClient(logger)
 
+	feedbackHistoryLimit := feedbackHistoryLimitFromEnv(logger)
+
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           handler.NewRouter(logger, db, bundle, tmpl, static.FS, llmClient),
+		Handler:           handler.NewRouter(logger, db, bundle, tmpl, static.FS, llmClient, handler.WithFeedbackHistoryLimit(feedbackHistoryLimit)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -120,6 +124,25 @@ func run(logger *slog.Logger) error {
 
 	logger.Info("server stopped")
 	return nil
+}
+
+// feedbackHistoryLimitFromEnv resolves how many recent recipes (with feedback)
+// feed the weekly-generation prompt. It reads FEEDBACK_HISTORY_LIMIT; an unset,
+// unparseable, or non-positive value falls back to defaultFeedbackHistoryLimit.
+// This is server-side configuration only — never exposed in the UI.
+func feedbackHistoryLimitFromEnv(logger *slog.Logger) int {
+	raw := os.Getenv("FEEDBACK_HISTORY_LIMIT")
+	limit := defaultFeedbackHistoryLimit
+	if raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		} else {
+			logger.Warn("invalid FEEDBACK_HISTORY_LIMIT; using default",
+				"value", raw, "default", defaultFeedbackHistoryLimit)
+		}
+	}
+	logger.Info("feedback history limit", "n", limit)
+	return limit
 }
 
 // newLLMClient selects the LLM provider from the environment: Anthropic when
