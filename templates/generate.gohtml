@@ -9,6 +9,7 @@
         <p class="recipe-card__time">{{ t "recipe.cook_time" .CookTime }}</p>
         <p class="recipe-card__desc">{{ .Description }}</p>
       </a>
+      {{ template "recipe/feedback" .Feedback }}
       <button type="button" class="recipe-card__swap"
               hx-post="/generate/swap/{{ .ID }}"
               hx-target="#week"
