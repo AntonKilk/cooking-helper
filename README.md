@@ -57,9 +57,22 @@ go test ./...
 ## HTTPS / PWA
 
 HTTPS is required for the Service Worker and is provided by **Tailscale Serve** on the host
-(tailnet-only, automatic Let's Encrypt). That is configured on the Mac mini, not in this repo
-(see CH-21 / ops). Plain `go run` over HTTP is fine for local development but will not register
-the Service Worker.
+(tailnet-only, automatic Let's Encrypt). Plain `go run` over HTTP is fine for local
+development but will not register the Service Worker. Host setup is documented in the deploy
+runbook ([`ops/deploy-runbook.md`](ops/deploy-runbook.md)).
+
+## Deployment & backups (Mac mini)
+
+Production runs on the Mac mini via Docker + Tailscale Serve. The full procedure — deploy,
+deferred-check run order, daily SQLite backups (`launchd` + `sqlite3 .backup`, 14-day
+retention), and iPad PWA verification — is in [`ops/deploy-runbook.md`](ops/deploy-runbook.md).
+Backup job: [`ops/backup/`](ops/backup/).
+
+## For beta users
+
+The beta-testing script (≥10 scenarios traced to the user stories, plus the success-metric
+capture sheet) is [`.agents/reports/beta-1-checklist.md`](.agents/reports/beta-1-checklist.md);
+results are recorded in [`.agents/reports/beta-1.md`](.agents/reports/beta-1.md).
 
 ## Layout
 

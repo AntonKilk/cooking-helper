@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd job: daily SQLite backup for Cooking Helper (CH-21 / tech-design §7).
+
+  Install on the Mac mini:
+    1. Edit the absolute path below to match where the repo lives.
+    2. cp com.cookinghelper.backup.plist ~/Library/LaunchAgents/
+    3. launchctl load ~/Library/LaunchAgents/com.cookinghelper.backup.plist
+    4. Smoke test now (don't wait for 03:00):
+         launchctl start com.cookinghelper.backup
+       then check the log path below and confirm a dated .db appeared.
+
+  ProgramArguments runs the script through `/bin/sh -lc` ON PURPOSE: launchd
+  execs a binary directly (no shell), so $(date) / find would not work if the
+  script were listed as bare arguments. The shell wrapper fixes that.
+  Also note: `docker` must be on PATH for the login shell, hence `-l`.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cookinghelper.backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-lc</string>
+        <!-- EDIT this absolute path to match the Mac mini checkout. -->
+        <string>/Users/anton/cooking-helper/ops/backup/backup.sh</string>
+    </array>
+
+    <!-- Daily at 03:00 (low-traffic; family is not generating menus then). -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Do not run on load/boot — only on the schedule (and manual `start`). -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- EDIT these paths to match the backups dir bind-mounted in compose. -->
+    <key>StandardOutPath</key>
+    <string>/Users/anton/cooking-helper/backups/backup.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/anton/cooking-helper/backups/backup.err.log</string>
+</dict>
+</plist>

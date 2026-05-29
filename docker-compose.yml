@@ -12,6 +12,12 @@ services:
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:
       - cooking-data:/data
+      # Daily `.backup` (tech-design §7) writes dated dumps to /backups inside
+      # the container. Bind it to a host directory so backups survive container
+      # recreation AND are visible to the host's launchd retention `find`.
+      # On the Mac mini this is an absolute host path, e.g.
+      #   /Users/anton/cooking-helper/backups:/backups
+      - ./backups:/backups
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
       interval: 30s
