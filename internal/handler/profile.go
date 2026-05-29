@@ -16,6 +16,8 @@ import (
 type householdProfiles interface {
 	Current(ctx context.Context, defaultLang domain.Language) (*domain.HouseholdProfile, error)
 	UpdateProfile(ctx context.Context, id string, lang domain.Language, adults, kids int) (*domain.HouseholdProfile, error)
+	AddPantryBasic(ctx context.Context, id, item string) (*domain.HouseholdProfile, error)
+	RemovePantryBasic(ctx context.Context, id, item string) (*domain.HouseholdProfile, error)
 }
 
 // profileHandlers serve the household profile screen.

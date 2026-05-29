@@ -32,6 +32,7 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	store := repository.New(db)
 	svc := service.NewHouseholdService(store)
 	ph := &profileHandlers{rd: rd, bundle: bundle, svc: svc}
+	pan := &pantryHandlers{rd: rd, bundle: bundle, svc: svc}
 	canGenerate := llmClient != nil
 	hh := &homeHandlers{rd: rd, canGenerate: canGenerate}
 	rh := &recipeHandlers{rd: rd, recipes: store}
@@ -49,6 +50,9 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
 	mux.HandleFunc("GET /settings/profile", ph.Show)
 	mux.HandleFunc("POST /settings/profile", ph.Save)
+	mux.HandleFunc("GET /settings/pantry", pan.Show)
+	mux.HandleFunc("POST /settings/pantry/add", pan.Add)
+	mux.HandleFunc("POST /settings/pantry/remove", pan.Remove)
 	mux.Handle("GET /static/", StaticFiles(staticFS))
 	mux.HandleFunc("GET /sw.js", ServiceWorker(staticFS))
 	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))

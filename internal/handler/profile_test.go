@@ -34,6 +34,22 @@ func (s *stubProfiles) UpdateProfile(_ context.Context, _ string, lang domain.La
 	return &c, nil
 }
 
+func (s *stubProfiles) AddPantryBasic(_ context.Context, _, item string) (*domain.HouseholdProfile, error) {
+	s.current.PantryBasics = append(s.current.PantryBasics, item)
+	return s.current, nil
+}
+
+func (s *stubProfiles) RemovePantryBasic(_ context.Context, _, item string) (*domain.HouseholdProfile, error) {
+	kept := s.current.PantryBasics[:0:0]
+	for _, existing := range s.current.PantryBasics {
+		if existing != item {
+			kept = append(kept, existing)
+		}
+	}
+	s.current.PantryBasics = kept
+	return s.current, nil
+}
+
 func newProfileRouter(t *testing.T, stub *stubProfiles) http.Handler {
 	t.Helper()
 	bundle := testBundle(t)

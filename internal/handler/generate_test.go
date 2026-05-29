@@ -22,6 +22,14 @@ func (stubHouseholds) UpdateProfile(_ context.Context, _ string, _ domain.Langua
 	return nil, nil
 }
 
+func (stubHouseholds) AddPantryBasic(_ context.Context, _, _ string) (*domain.HouseholdProfile, error) {
+	return nil, nil
+}
+
+func (stubHouseholds) RemovePantryBasic(_ context.Context, _, _ string) (*domain.HouseholdProfile, error) {
+	return nil, nil
+}
+
 // stubGenerator returns canned data for the handler tests. The same stub serves
 // both GenerateWeek and the swap path: SwapRecipe returns swapped/err and
 // CurrentPlan returns plan/planErr.

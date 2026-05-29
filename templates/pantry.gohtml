@@ -1,0 +1,55 @@
+{{- define "pantry/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "pantry/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "pantry/content" -}}
+  <h1>{{ t "pantry.heading" }}</h1>
+  <p>{{ t "pantry.description" }}</p>
+  {{ template "pantry/list" . }}
+{{- end -}}
+
+{{- define "pantry/list" -}}
+  <div id="pantry-list">
+    <form method="post" action="/settings/pantry/add"
+          hx-post="/settings/pantry/add" hx-target="#pantry-list" hx-swap="outerHTML">
+      <label>{{ t "pantry.add_label" }}
+        <input type="text" name="item" placeholder="{{ t "pantry.add_placeholder" }}" autocomplete="off" required>
+      </label>
+      <button type="submit">{{ t "pantry.add" }}</button>
+    </form>
+
+    {{- if .Error }}
+    <p role="alert">{{ t .Error }}</p>
+    {{- end }}
+
+    {{- if .Items }}
+    <ul class="pantry-items">
+      {{- range .Items }}
+      <li>
+        <span>{{ . }}</span>
+        <form method="post" action="/settings/pantry/remove"
+              hx-post="/settings/pantry/remove" hx-target="#pantry-list" hx-swap="outerHTML">
+          <input type="hidden" name="item" value="{{ . }}">
+          <button type="submit">{{ t "pantry.remove" }}</button>
+        </form>
+      </li>
+      {{- end }}
+    </ul>
+    {{- else }}
+    <p>{{ t "pantry.empty" }}</p>
+    {{- end }}
+  </div>
+{{- end -}}
