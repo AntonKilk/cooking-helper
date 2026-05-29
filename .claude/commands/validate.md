@@ -32,9 +32,11 @@ golangci-lint run ./...
 go test ./...
 ```
 
-If `golangci-lint` is not installed:
+If `golangci-lint` is not installed (this repo pins go1.26.3 and uses a **v2**
+`.golangci.yml`, so install the **v2** module path under the pinned toolchain — a stock
+`@latest` install of the v1 path is built with an older Go and refuses the v2 config):
 ```bash
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+GOTOOLCHAIN=go1.26.3 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 ```
 
 ### Java (Maven)
