@@ -1,0 +1,73 @@
+{{- define "onboarding/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "onboarding/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "onboarding/content" -}}
+  <section class="onboarding">
+    <p class="onboarding__progress">{{ t "onboarding.step_indicator" .Step }}</p>
+
+    {{- if eq .Step 1 }}
+    <h1>{{ t "onboarding.welcome_heading" }}</h1>
+    <h2>{{ t "onboarding.step_profile_heading" }}</h2>
+
+    {{- if .Error }}
+    <p role="alert">{{ t .Error }}</p>
+    {{- end }}
+
+    <form method="post" action="/onboarding/profile">
+      <p>
+        <label>{{ t "profile.adults" }}
+          <input type="number" name="adults" min="1" max="6" value="{{ .Adults }}" required>
+        </label>
+      </p>
+      <p>
+        <label>{{ t "profile.kids" }}
+          <input type="number" name="kids" min="0" max="6" value="{{ .Kids }}" required>
+        </label>
+      </p>
+      <fieldset>
+        <legend>{{ t "profile.language" }}</legend>
+        <label><input type="radio" name="lang" value="ru" {{ if eq .Lang "ru" }}checked{{ end }}>{{ t "lang.ru" }}</label>
+        <label><input type="radio" name="lang" value="fi" {{ if eq .Lang "fi" }}checked{{ end }}>{{ t "lang.fi" }}</label>
+        <label><input type="radio" name="lang" value="en" {{ if eq .Lang "en" }}checked{{ end }}>{{ t "lang.en" }}</label>
+      </fieldset>
+      <button type="submit">{{ t "onboarding.next" }}</button>
+    </form>
+
+    {{- else if eq .Step 2 }}
+    <h1>{{ t "onboarding.step_pantry_heading" }}</h1>
+    <p>{{ t "onboarding.step_pantry_intro" }}</p>
+    {{ template "pantry/list" . }}
+    <p><a href="/onboarding?step=3" hx-get="/onboarding?step=3" hx-target="#content" hx-push-url="true">{{ t "onboarding.next" }}</a></p>
+
+    {{- else }}
+    <h1>{{ t "onboarding.step_cycle_heading" }}</h1>
+    <p>{{ t "onboarding.cycle_body" }}</p>
+    <ol class="onboarding__cycle">
+      <li>{{ t "onboarding.cycle_generate" }}</li>
+      <li>{{ t "onboarding.cycle_cook" }}</li>
+      <li>{{ t "onboarding.cycle_feedback" }}</li>
+    </ol>
+    <form method="post" action="/onboarding/complete">
+      <button type="submit">{{ t "onboarding.finish" }}</button>
+    </form>
+    {{- end }}
+
+    <form method="post" action="/onboarding/complete" class="onboarding__skip">
+      <button type="submit">{{ t "onboarding.skip" }}</button>
+    </form>
+  </section>
+{{- end -}}

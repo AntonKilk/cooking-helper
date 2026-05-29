@@ -56,7 +56,8 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	ph := &profileHandlers{rd: rd, bundle: bundle, svc: svc}
 	pan := &pantryHandlers{rd: rd, bundle: bundle, svc: svc}
 	canGenerate := llmClient != nil
-	hh := &homeHandlers{rd: rd, canGenerate: canGenerate}
+	hh := &homeHandlers{rd: rd, canGenerate: canGenerate, profiles: svc}
+	oh := &onboardingHandlers{rd: rd, bundle: bundle, svc: svc}
 	rh := &recipeHandlers{rd: rd, recipes: store, feedback: service.NewRecipeService(store)}
 	sh := &shoppingHandlers{rd: rd, store: store, households: svc}
 	dh := &dislikedHandlers{rd: rd, profiles: svc, history: store}
@@ -65,6 +66,9 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
 	mux.HandleFunc("GET /{$}", hh.Home)
+	mux.HandleFunc("GET /onboarding", oh.Show)
+	mux.HandleFunc("POST /onboarding/profile", oh.SaveProfile)
+	mux.HandleFunc("POST /onboarding/complete", oh.Complete)
 	mux.HandleFunc("GET /recipe/{id}", rh.Show)
 	mux.HandleFunc("POST /recipe/{id}/feedback", rh.Feedback)
 	mux.HandleFunc("GET /shopping", sh.List)

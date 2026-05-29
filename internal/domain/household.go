@@ -42,6 +42,9 @@ type HouseholdProfile struct {
 	FamilySize          FamilySize
 	DislikedIngredients []string
 	PantryBasics        []string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	// Onboarded is true once the first-run onboarding wizard has been completed
+	// or skipped; while false the home screen redirects to it.
+	Onboarded bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
