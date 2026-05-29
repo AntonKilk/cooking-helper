@@ -98,7 +98,8 @@ func postGenerate() (*httptest.ResponseRecorder, *http.Request) {
 func TestGenerateRendersCards(t *testing.T) {
 	week := &service.GeneratedWeek{
 		Recipes: []domain.Recipe{
-			{ID: "r1", Title: "Chicken Pasta", Description: "Creamy", CookTimeMinutes: 25},
+			{ID: "r1", Title: "Chicken Pasta", Description: "Creamy", CookTimeMinutes: 25,
+				Feedback: &domain.Feedback{Liked: true}},
 			{ID: "r2", Title: "Beef Tacos", Description: "Spicy", CookTimeMinutes: 20},
 			{ID: "r3", Title: "Salmon Bowl", Description: "Fresh", CookTimeMinutes: 30},
 		},
@@ -120,6 +121,10 @@ func TestGenerateRendersCards(t *testing.T) {
 		`hx-post="/generate/swap/r1"`,
 		`hx-post="/generate/swap/r2"`,
 		`hx-post="/generate"`,
+		// Feedback control is integrated into each card (CH-16).
+		`hx-post="/recipe/r1/feedback"`,
+		`hx-post="/recipe/r2/feedback"`,
+		"feedback__btn--active", // r1 carries a like
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body missing %q:\n%s", want, body)
