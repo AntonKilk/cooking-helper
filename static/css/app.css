@@ -6,7 +6,8 @@
   --surface: #FCFAF5;   /* ivory */
   --text: #2B2118;      /* deep oak */
   --text-muted: #6B5F52;/* muted brown */
-  --accent: #C2603A;    /* terracotta */
+  --accent: #C2603A;    /* terracotta — decorative / large text only */
+  --accent-text: #A84B28;/* darker terracotta — AA-safe for body links & button labels (≥4.5:1 on cream/ivory) */
   --success: #5C7A4E;   /* moss green */
   --border: #E5DBC9;    /* soft sand */
 
@@ -39,7 +40,7 @@ h1, h2, h3 {
 h1 { font-size: 2.25rem; } /* ≥24pt headings */
 h2 { font-size: 1.75rem; }
 
-a { color: var(--accent); }
+a { color: var(--accent-text); }
 
 main {
   display: block;
@@ -72,7 +73,8 @@ main {
   gap: 0.5rem;
 }
 
-.app-header__shopping {
+.app-header__shopping,
+.app-header__archive {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,7 +82,7 @@ main {
   padding: 0 0.75rem;
   font-size: 1.125rem;
   text-decoration: none;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .app-header__settings {
@@ -91,7 +93,7 @@ main {
   min-height: var(--touch);
   font-size: 1.5rem;
   text-decoration: none;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Touch-friendly controls: ≥44px targets, no hover-only interactions. */
@@ -132,7 +134,7 @@ main:has(> .recipe) { max-width: none; }
   margin-bottom: var(--space);
   font-size: 1.125rem;
   text-decoration: none;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .recipe__title { font-size: 2.5rem; margin-bottom: 0.25em; }
@@ -236,6 +238,11 @@ html { -webkit-tap-highlight-color: transparent; }
     --text: #F5EFE6;
     --text-muted: #C9BBA8;
     --border: #4A3C2E;
+    /* Inverted Nordic Kitchen: lighten warm accents so links and active-button
+       fills clear WCAG AA against the dark oak background (≥4.5:1). */
+    --accent: #D17A4D;
+    --accent-text: #D17A4D;
+    --success: #8FB07E;
   }
 }
 
@@ -301,7 +308,7 @@ html { -webkit-tap-highlight-color: transparent; }
   min-height: var(--touch);
   padding: 0 1rem;
   background: var(--surface);
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -364,13 +371,248 @@ html { -webkit-tap-highlight-color: transparent; }
 .feedback__icon { font-size: 1.5rem; line-height: 1; }
 
 .feedback__btn--active {
-  background: var(--accent);
-  color: var(--surface);
-  border-color: var(--accent);
+  background: var(--accent-text);
+  color: var(--bg);
+  border-color: var(--accent-text);
 }
 
 /* Keyboard focus ring on the label when its checkbox is focused. */
 .feedback__btn:focus-within {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
+
+/* ---------------------------------------------------------------------------
+   CH-20 iPad polish: shared form/button defaults, safe-area insets, and the
+   component styles for views that previously rendered with no CSS (home /
+   week cards / archive / disliked / pantry). Built on the existing tokens.
+   --------------------------------------------------------------------------- */
+
+/* Safe-area insets so content clears the iPad landscape home indicator and any
+   rounded corners when installed as a standalone PWA. */
+.app-header {
+  padding-top: max(var(--space), env(safe-area-inset-top));
+  padding-left: max(var(--space), env(safe-area-inset-left));
+  padding-right: max(var(--space), env(safe-area-inset-right));
+}
+
+main {
+  padding-left: max(var(--space), env(safe-area-inset-left));
+  padding-right: max(var(--space), env(safe-area-inset-right));
+  padding-bottom: max(var(--space), env(safe-area-inset-bottom));
+}
+
+/* HTMX ships no stylesheet here (we self-host the JS only), so define the
+   indicator behavior: hidden until the triggering element is mid-request. */
+.htmx-indicator { opacity: 0; transition: opacity 0.2s ease; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { opacity: 1; }
+
+/* Visible keyboard focus everywhere, on the AA-safe accent. */
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* Text inputs — styled to match the cards instead of the browser default. */
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Default (secondary) button: surface fill, AA-safe accent label. Buttons that
+   set their own background (recipe-step toggle, shopping remove) override this. */
+button {
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Primary action buttons: filled terracotta with background-colored label. */
+.generate__button,
+.week__regenerate,
+.archive-item__cook-again {
+  background: var(--accent-text);
+  color: var(--bg);
+  border-color: var(--accent-text);
+}
+
+/* Home — generation trigger + shortcut. */
+.generate { margin: var(--space) 0; }
+
+.generate__button { font-size: 1.375rem; padding: 0.75rem 1.5rem; }
+
+.generate__hint,
+.generate__indicator {
+  margin: 0.75rem 0 0;
+  font-size: 1.125rem;
+  color: var(--text-muted);
+}
+
+.home-shopping { margin-top: var(--space); }
+
+/* Weekly menu cards. */
+.week { margin-top: var(--space); }
+.week__heading { margin-top: 0; }
+
+.week__cards {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space);
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .week__cards { grid-template-columns: repeat(3, 1fr); }
+}
+
+.recipe-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: var(--space);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.recipe-card__link {
+  display: block;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.recipe-card__emoji { font-size: 2.5rem; line-height: 1; }
+.recipe-card__title { font-size: 1.5rem; margin: 0.25rem 0; }
+.recipe-card__time { margin: 0; color: var(--text-muted); font-size: 1.125rem; }
+.recipe-card__desc { margin: 0.25rem 0 0; font-size: 1.125rem; }
+
+.recipe-card__swap { align-self: flex-start; min-height: var(--touch); }
+
+.week__regenerate {
+  min-height: var(--touch);
+  padding: 0 1.5rem;
+  font-size: 1.25rem;
+}
+
+.week__error { color: var(--accent-text); font-size: 1.25rem; }
+
+/* Archive — search + result cards + cook-again dialog. */
+.archive-search { margin-bottom: var(--space); font-size: 1.25rem; min-height: var(--touch); }
+
+.archive-list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space); }
+
+.archive-list__empty,
+.archive-list__error { color: var(--text-muted); font-size: 1.25rem; }
+.archive-list__error { color: var(--accent-text); }
+
+.archive-item {
+  padding: var(--space);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.archive-item__link { display: block; text-decoration: none; color: var(--text); }
+.archive-item__title { font-size: 1.5rem; margin: 0 0 0.25rem; }
+.archive-item__time { margin: 0; color: var(--text-muted); font-size: 1.125rem; }
+.archive-item__desc { margin: 0.25rem 0 0; font-size: 1.125rem; }
+
+.archive-item__feedback { margin: 0.5rem 0; display: flex; gap: 0.5rem; }
+.archive-item__icon { font-size: 1.5rem; line-height: 1; }
+
+.archive-item__cook-again { min-height: var(--touch); margin-top: 0.5rem; }
+.archive-item__dialog:empty { display: none; }
+
+.archive-dialog { margin-top: 0.75rem; }
+.archive-dialog__heading { margin: 0 0 0.5rem; font-size: 1.125rem; color: var(--text-muted); }
+.archive-dialog__choices { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.archive-dialog__choices form { margin: 0; }
+.archive-dialog__choice { width: 100%; min-height: var(--touch); text-align: left; }
+.archive-dialog__empty { color: var(--text-muted); font-size: 1.125rem; }
+
+.archive-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space);
+  margin-top: 0.75rem;
+  font-size: 1.125rem;
+}
+
+.archive-error { margin-top: 0.75rem; color: var(--accent-text); font-size: 1.125rem; }
+
+/* Disliked ingredients + pantry basics — add form + removable chips. */
+.disliked-add,
+#pantry-list form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: var(--space);
+}
+
+.disliked-add label,
+#pantry-list label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 12rem;
+  font-size: 1.125rem;
+}
+
+.disliked-add button,
+#pantry-list > form > button {
+  min-height: var(--touch);
+}
+
+.disliked-list,
+.pantry-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.disliked-item,
+.pantry-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  min-height: var(--touch);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.disliked-item__name { flex: 1; }
+
+.disliked-item__remove,
+.pantry-items form {
+  margin: 0;
+}
+
+.disliked-item__remove button,
+.pantry-items form button {
+  min-height: var(--touch);
+}
+
+.disliked-list__empty { color: var(--text-muted); font-size: 1.125rem; padding: 0.5rem 0; }
