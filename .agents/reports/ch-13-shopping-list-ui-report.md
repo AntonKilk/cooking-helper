@@ -41,9 +41,10 @@ unconditionally, so it works even when no LLM client is configured.
 | `gofmt -s -l .` | ✅ clean |
 | `go vet ./...` | ✅ |
 | `golangci-lint run ./...` | ✅ 0 issues |
-| `go test ./...` | ✅ all packages pass |
+| `go test ./...` | ✅ all packages pass (verified on go1.26.3) |
 | Static `CGO_ENABLED=0` build | ✅ |
 | Live binary HTTP smoke (`/shopping`, `/`, `/healthz`) | ✅ |
+| `govulncheck ./...` | ⚠️ ran locally — 9 findings, **all Go stdlib**, none in CH-13 code or called deps; remediated by pinning toolchain go1.26.3 (see below) |
 
 ## Files Changed
 
@@ -63,6 +64,8 @@ unconditionally, so it works even when no LLM client is configured.
 | `templates/home.gohtml` | UPDATE | replaced static category list with shopping link |
 | `internal/handler/language_test.go` | UPDATE | repointed home assertions to the shopping link |
 | `i18n/en.json`, `i18n/fi.json`, `i18n/ru.json` | UPDATE | `nav.shopping` + `shopping.*` keys |
+| `go.mod` | UPDATE | pin `toolchain go1.26.3` (govulncheck remediation) |
+| `Dockerfile` | UPDATE | build stage → `golang:1.26.3-alpine` |
 
 ## Deviations from Plan
 
@@ -85,7 +88,27 @@ unconditionally, so it works even when no LLM client is configured.
 |------|-----|----------------|
 | Service-Worker offline replay of checkbox writes | `static/sw.js` is GET-only; no POST queue/Background-Sync built | Future SW work; tailnet HTTPS / CH-21. Server contract (idempotent writes) is delivered and tested. |
 | Real-browser HTMX swap / touch-target smoke | needs running server + Safari | tailnet HTTPS / Mac mini |
-| `govulncheck ./...` | `vuln.go.dev` 403 in sandbox; no new deps added | CH-21 deploy gate |
+| `govulncheck` final clean re-run | `vuln.go.dev` 403 in sandbox | Re-run locally after the toolchain bump (auto-switches to go1.26.3) to confirm `No vulnerabilities found` |
+
+### govulncheck — resolved (toolchain bump)
+
+A local `govulncheck ./...` (toolchain go1.26.1) surfaced **9 vulnerabilities, all
+in the Go standard library** (`html/template`, `crypto/tls`, `crypto/x509`, `net`,
+`net/http`) — advisories GO-2026-4865/4866/4870/4918/4946/4947/4971/4980/4982. None
+are in CH-13 code or in any third-party dependency our code calls (govulncheck:
+*"your code doesn't appear to call these"* for the imported/required-module findings).
+Not introduced by CH-13 — they affect the whole project equally and are a function of
+the build toolchain version.
+
+**Remediation (applied):** all nine are fixed in **go1.26.3**, so the build toolchain
+is now pinned:
+- `go.mod` — added `toolchain go1.26.3`
+- `Dockerfile` — build stage bumped to `golang:1.26.3-alpine`
+
+Verified in-sandbox: `go build ./...`, `go vet ./...`, `gofmt -s -l .`, and
+`go test ./...` all pass on go1.26.3. The final `govulncheck` clean verdict must be
+re-run locally (sandbox `vuln.go.dev` returns 403) — it will auto-switch to go1.26.3
+and should report no findings.
 
 ## Tests Written
 
