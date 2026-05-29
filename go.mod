@@ -2,6 +2,11 @@ module github.com/AntonKilk/cooking-helper
 
 go 1.25.0
 
+// Pin a patched build toolchain: go1.26.0–1.26.2 stdlib carry several
+// html/template / crypto / net advisories (GO-2026-4865/4866/4870/4918/4946/4947/
+// 4971/4980/4982). All are fixed in go1.26.3 — builds and CI must use ≥ this.
+toolchain go1.26.3
+
 require (
 	github.com/anthropics/anthropic-sdk-go v1.45.0
 	github.com/golang-migrate/migrate/v4 v4.19.1

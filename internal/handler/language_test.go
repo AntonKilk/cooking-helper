@@ -88,13 +88,13 @@ func TestHomeRendersByAcceptLanguage(t *testing.T) {
 	srv := newTestRouter(t)
 	cases := []struct {
 		header string
-		want   string // a localized category string expected in the body
+		want   string // a localized string expected in the body
 		lang   string
 	}{
-		{"fi-FI,fi;q=0.9", "Pakasteet", "fi"},
-		{"ru-RU,ru;q=0.9", "Овощи и фрукты", "ru"},
-		{"en-US,en;q=0.9", "Produce", "en"},
-		{"de-DE", "Produce", "en"}, // unsupported → default EN
+		{"fi-FI,fi;q=0.9", "Ostoslista", "fi"},
+		{"ru-RU,ru;q=0.9", "Список покупок", "ru"},
+		{"en-US,en;q=0.9", "Shopping list", "en"},
+		{"de-DE", "Shopping list", "en"}, // unsupported → default EN
 	}
 	for _, c := range cases {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -131,7 +131,7 @@ func TestHomeHTMXReturnsFragment(t *testing.T) {
 	if strings.Contains(strings.ToLower(body), "<!doctype") {
 		t.Errorf("HTMX request returned a full page, want content fragment only:\n%s", body)
 	}
-	if !strings.Contains(body, "Produce") {
+	if !strings.Contains(body, "Shopping list") {
 		t.Errorf("fragment missing home content:\n%s", body)
 	}
 }
@@ -167,7 +167,7 @@ func TestHomeCookieWinsOverHeader(t *testing.T) {
 
 	srv.ServeHTTP(rec, req)
 
-	if !strings.Contains(rec.Body.String(), "Pakasteet") {
+	if !strings.Contains(rec.Body.String(), "Ostoslista") {
 		t.Error("cookie language (fi) did not win over Accept-Language header")
 	}
 }

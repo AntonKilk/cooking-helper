@@ -22,18 +22,16 @@ type homeHandlers struct {
 
 // homeData is the view model for the home page.
 type homeData struct {
-	Lang         string
-	CategoryKeys []string
-	CanGenerate  bool
+	Lang        string
+	CanGenerate bool
 }
 
-// Home renders the localized home page: the generate-week action plus the store
-// categories. The button is inert when generation is not configured.
+// Home renders the localized home page: the generate-week action plus a link to
+// the shopping list. The button is inert when generation is not configured.
 func (hh *homeHandlers) Home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{
-		Lang:         string(LanguageFromContext(r.Context())),
-		CategoryKeys: categoryKeys,
-		CanGenerate:  hh.canGenerate,
+		Lang:        string(LanguageFromContext(r.Context())),
+		CanGenerate: hh.canGenerate,
 	}
 	hh.rd.render(w, r, "home", data)
 }
