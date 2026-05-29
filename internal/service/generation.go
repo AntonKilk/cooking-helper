@@ -70,6 +70,9 @@ type generationRepo interface {
 	ArchiveAndCreateWeek(ctx context.Context, previousPlanID string, p *domain.WeeklyPlan, recipes []domain.Recipe) error
 	RecipesByIDs(ctx context.Context, ids []string) ([]domain.Recipe, error)
 	SwapRecipeInPlan(ctx context.Context, planID, oldRecipeID string, newRecipe *domain.Recipe, items []domain.ShoppingListItem) error
+	// GetRecipe loads a single recipe by ID for the "cook again" replay; it must
+	// return repository.ErrNotFound when the recipe is absent.
+	GetRecipe(ctx context.Context, id string) (*domain.Recipe, error)
 }
 
 // shoppingBuilder consolidates a week's recipes into a categorized shopping list.
@@ -341,6 +344,66 @@ func (g *GenerationService) SwapRecipe(ctx context.Context, h *domain.HouseholdP
 	plan.ShoppingList = list
 
 	return &SwappedRecipe{Plan: plan, Recipe: newRecipe, Protein: protein}, nil
+}
+
+// CookAgain replays an archived recipe into the household's current plan,
+// replacing oldRecipeID with a fresh copy of sourceRecipeID and rebuilding the
+// shopping list. Unlike SwapRecipe this makes no LLM generation call and skips
+// the dislike/portion/variety checks: the user is explicitly re-choosing a dish
+// they already cooked, so it is not held to the generator's hard constraints.
+//
+// The source recipe is COPIED (new ID assigned by the repository) rather than
+// re-referenced — a plan's recipe_ids cannot point at a row that already belongs
+// to another plan without colliding on insert — and the copy is tagged
+// SourceHistory with its feedback cleared, since this is a new occurrence. The
+// copy + recipe_ids rotation + shopping-list replacement land in one transaction
+// via SwapRecipeInPlan; plan.RecipeIDs and plan.ShoppingList are updated in place.
+func (g *GenerationService) CookAgain(ctx context.Context, h *domain.HouseholdProfile, plan *domain.WeeklyPlan, oldRecipeID, sourceRecipeID string) (*SwappedRecipe, error) {
+	ctx, cancel := context.WithTimeout(ctx, generationTimeout)
+	defer cancel()
+
+	idx := indexOfString(plan.RecipeIDs, oldRecipeID)
+	if idx < 0 {
+		return nil, fmt.Errorf("cook again: %w", ErrGenerationInvalid)
+	}
+
+	source, err := g.repo.GetRecipe(ctx, sourceRecipeID)
+	if err != nil {
+		return nil, fmt.Errorf("cook again: %w", err)
+	}
+
+	keptIDs := make([]string, 0, len(plan.RecipeIDs)-1)
+	for i, id := range plan.RecipeIDs {
+		if i == idx {
+			continue
+		}
+		keptIDs = append(keptIDs, id)
+	}
+	kept, err := g.repo.RecipesByIDs(ctx, keptIDs)
+	if err != nil {
+		return nil, fmt.Errorf("cook again: %w", err)
+	}
+
+	// Copy the source recipe as a fresh, household-owned history occurrence.
+	newRecipe := *source
+	newRecipe.ID = ""
+	newRecipe.HouseholdID = h.ID
+	newRecipe.Source = domain.SourceHistory
+	newRecipe.Feedback = nil
+
+	allRecipes := append(append(make([]domain.Recipe, 0, len(kept)+1), kept...), newRecipe)
+	list, err := g.builder.Build(ctx, allRecipes, h.PantryBasics)
+	if err != nil {
+		return nil, fmt.Errorf("cook again: %w", err)
+	}
+
+	if err := g.repo.SwapRecipeInPlan(ctx, plan.ID, oldRecipeID, &newRecipe, list); err != nil {
+		return nil, fmt.Errorf("cook again: %w", err)
+	}
+	plan.RecipeIDs[idx] = newRecipe.ID
+	plan.ShoppingList = list
+
+	return &SwappedRecipe{Plan: plan, Recipe: newRecipe, Protein: inferProtein(newRecipe)}, nil
 }
 
 // completeSwap sends one swap request and decodes the single-recipe reply.

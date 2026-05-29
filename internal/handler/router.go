@@ -60,6 +60,7 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	rh := &recipeHandlers{rd: rd, recipes: store, feedback: service.NewRecipeService(store)}
 	sh := &shoppingHandlers{rd: rd, store: store, households: svc}
 	dh := &dislikedHandlers{rd: rd, profiles: svc, history: store}
+	ah := &archiveHandlers{rd: rd, recipes: store, households: svc, plans: store, canCook: canGenerate}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
@@ -80,6 +81,8 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux.HandleFunc("GET /settings/pantry", pan.Show)
 	mux.HandleFunc("POST /settings/pantry/add", pan.Add)
 	mux.HandleFunc("POST /settings/pantry/remove", pan.Remove)
+	mux.HandleFunc("GET /archive", ah.Show)
+	mux.HandleFunc("GET /archive/search", ah.Search)
 	mux.Handle("GET /static/", StaticFiles(staticFS))
 	mux.HandleFunc("GET /sw.js", ServiceWorker(staticFS))
 	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))
@@ -89,14 +92,21 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 		if cfg.feedbackHistoryLimit > 0 {
 			genOpts = append(genOpts, service.WithRecentLimit(cfg.feedbackHistoryLimit))
 		}
+		gen := service.NewGenerationService(llmClient, store, service.NewShoppingBuilder(llmClient, store), genOpts...)
 		gh := &generateHandlers{
 			rd:         rd,
 			households: svc,
-			gen:        service.NewGenerationService(llmClient, store, service.NewShoppingBuilder(llmClient, store), genOpts...),
+			gen:        gen,
 			recipes:    store,
 		}
 		mux.HandleFunc("POST /generate", gh.Generate)
 		mux.HandleFunc("POST /generate/swap/{recipeID}", gh.Swap)
+
+		// "Cook again" reuses the generation service's plan mutation + shopping
+		// rebuild, so it is wired only when the LLM is configured.
+		ah.cook = gen
+		mux.HandleFunc("GET /archive/cook-again/{id}", ah.CookAgainDialog)
+		mux.HandleFunc("POST /archive/cook-again/{id}", ah.CookAgain)
 	}
 
 	return requestLogger(logger, languageMiddleware(bundle, mux))

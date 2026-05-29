@@ -43,6 +43,15 @@ type fakeGenRepo struct {
 	swapOldID       string
 	swapNewRecipe   *domain.Recipe
 	swapItems       []domain.ShoppingListItem
+	getByID         map[string]domain.Recipe
+}
+
+func (r *fakeGenRepo) GetRecipe(_ context.Context, id string) (*domain.Recipe, error) {
+	rec, ok := r.getByID[id]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return &rec, nil
 }
 
 func (r *fakeGenRepo) RecentRecipes(_ context.Context, _ string, limit int) ([]domain.Recipe, error) {
@@ -730,6 +739,86 @@ func TestSwapRecipeRebuildsShoppingList(t *testing.T) {
 	}
 	if len(got.Plan.ShoppingList) != 1 || got.Plan.ShoppingList[0].Name != "beef" {
 		t.Fatalf("returned plan shopping list = %+v, want rebuilt list", got.Plan.ShoppingList)
+	}
+}
+
+func TestCookAgainHappyPath(t *testing.T) {
+	h, plan, repo := swapKeptHousehold(t)
+	h.PantryBasics = []string{"oil"}
+	// The archived source recipe the user wants to cook again.
+	repo.getByID = map[string]domain.Recipe{
+		"arch-1": {
+			ID: "arch-1", HouseholdID: "someone-else", Title: "Beef Tacos", Servings: 4,
+			Source:      domain.SourceLLM,
+			Feedback:    &domain.Feedback{Liked: true},
+			Ingredients: []domain.Ingredient{{Name: "beef"}, {Name: "tortilla"}},
+		},
+	}
+	builder := &fakeBuilder{items: []domain.ShoppingListItem{
+		{Name: "beef", Amount: 1, Unit: "pcs", Category: domain.CategoryMeatFish},
+	}}
+	// No LLM is needed for cook-again; pass a client that fails if called.
+	svc := NewGenerationService(&fakeLLM{replies: nil}, repo, builder)
+
+	got, err := svc.CookAgain(context.Background(), h, plan, "old-B", "arch-1")
+	if err != nil {
+		t.Fatalf("cook again: %v", err)
+	}
+
+	// The persisted recipe must be a fresh, household-owned history copy.
+	if repo.swapNewRecipe == nil {
+		t.Fatal("expected SwapRecipeInPlan to receive the copied recipe")
+	}
+	if repo.swapNewRecipe.Source != domain.SourceHistory {
+		t.Fatalf("copy source = %q, want history", repo.swapNewRecipe.Source)
+	}
+	if repo.swapNewRecipe.HouseholdID != h.ID {
+		t.Fatalf("copy household = %q, want %q", repo.swapNewRecipe.HouseholdID, h.ID)
+	}
+	if repo.swapNewRecipe.Feedback != nil {
+		t.Fatalf("copy feedback = %+v, want nil (fresh occurrence)", repo.swapNewRecipe.Feedback)
+	}
+	if got.Recipe.Title != "Beef Tacos" {
+		t.Fatalf("title = %q, want Beef Tacos", got.Recipe.Title)
+	}
+	if repo.swapPlanID != "plan-99" || repo.swapOldID != "old-B" {
+		t.Fatalf("swap call = (plan=%q, old=%q), want (plan-99, old-B)", repo.swapPlanID, repo.swapOldID)
+	}
+	if plan.RecipeIDs[1] != got.Recipe.ID {
+		t.Fatalf("plan.RecipeIDs[1] = %q, want %q (in-place rotation)", plan.RecipeIDs[1], got.Recipe.ID)
+	}
+	// Shopping list rebuilt from kept + copy and propagated to plan.
+	if len(builder.gotRecipes) != 3 {
+		t.Fatalf("builder got %d recipes, want 3 (2 kept + copy)", len(builder.gotRecipes))
+	}
+	if len(got.Plan.ShoppingList) != 1 || got.Plan.ShoppingList[0].Name != "beef" {
+		t.Fatalf("returned plan shopping list = %+v, want rebuilt list", got.Plan.ShoppingList)
+	}
+}
+
+func TestCookAgainUnknownOldID(t *testing.T) {
+	h, plan, repo := swapKeptHousehold(t)
+	repo.getByID = map[string]domain.Recipe{"arch-1": {ID: "arch-1", Title: "Beef Tacos", Servings: 4}}
+	svc := newTestGenService(&fakeLLM{replies: nil}, repo)
+
+	if _, err := svc.CookAgain(context.Background(), h, plan, "nope", "arch-1"); !errors.Is(err, ErrGenerationInvalid) {
+		t.Fatalf("err = %v, want ErrGenerationInvalid", err)
+	}
+	if repo.swapPlanID != "" {
+		t.Fatal("must not call repo.SwapRecipeInPlan when oldID is unknown")
+	}
+}
+
+func TestCookAgainSourceNotFound(t *testing.T) {
+	h, plan, repo := swapKeptHousehold(t)
+	repo.getByID = map[string]domain.Recipe{} // source missing
+	svc := newTestGenService(&fakeLLM{replies: nil}, repo)
+
+	if _, err := svc.CookAgain(context.Background(), h, plan, "old-B", "ghost"); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+	if repo.swapPlanID != "" {
+		t.Fatal("must not persist when the source recipe is missing")
 	}
 }
 

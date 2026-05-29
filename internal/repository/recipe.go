@@ -152,6 +152,51 @@ func (s *Store) RecentRecipes(ctx context.Context, householdID string, limit int
 	return recipes, nil
 }
 
+// SearchRecipes loads up to limit of the household's recipes whose title contains
+// query (case-insensitive ASCII substring), newest first. An empty query matches
+// every recipe, so the same method backs both the full archive list and the
+// search-as-you-type fragment. The query is matched as a literal substring: LIKE
+// wildcards in the user's input are escaped, never interpreted.
+func (s *Store) SearchRecipes(ctx context.Context, householdID, query string, limit int) ([]domain.Recipe, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	pattern := "%" + escapeLike(strings.TrimSpace(query)) + "%"
+
+	q := `SELECT ` + recipeColumns + `
+		FROM recipe WHERE household_id = ? AND title LIKE ? ESCAPE '\'
+		ORDER BY created_at DESC LIMIT ?`
+
+	rows, err := s.db.QueryContext(ctx, q, householdID, pattern, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search recipes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var recipes []domain.Recipe
+	for rows.Next() {
+		r, err := scanRecipe(rows)
+		if err != nil {
+			return nil, err
+		}
+		recipes = append(recipes, *r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate search recipes: %w", err)
+	}
+	return recipes, nil
+}
+
+// escapeLike escapes the SQL LIKE metacharacters in s so user input is matched
+// literally under `ESCAPE '\'`. The backslash itself is escaped first so the
+// later replacements do not double-escape it.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "%", `\%`)
+	s = strings.ReplaceAll(s, "_", `\_`)
+	return s
+}
+
 // RecipesByIDs loads the recipes whose IDs are in ids, preserving the requested
 // order. Returns ErrNotFound if any id is missing — callers (e.g. the swap
 // service loading the two kept recipes) need all of them to proceed. An empty
