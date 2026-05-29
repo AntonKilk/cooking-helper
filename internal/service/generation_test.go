@@ -32,19 +32,21 @@ func (f *fakeLLM) Complete(_ context.Context, _ llm.Request) (llm.Completion, er
 // archive-and-create, and the most recent swap call, and serves canned data
 // (history, current plan, kept recipes) back to the service.
 type fakeGenRepo struct {
-	recent        []domain.Recipe
-	saved         *domain.WeeklyPlan
-	savedRec      []domain.Recipe
-	archivedPrev  string
-	currentPlan   *domain.WeeklyPlan
-	keptByID      map[string]domain.Recipe
-	swapPlanID    string
-	swapOldID     string
-	swapNewRecipe *domain.Recipe
-	swapItems     []domain.ShoppingListItem
+	recent          []domain.Recipe
+	recentLimitSeen int
+	saved           *domain.WeeklyPlan
+	savedRec        []domain.Recipe
+	archivedPrev    string
+	currentPlan     *domain.WeeklyPlan
+	keptByID        map[string]domain.Recipe
+	swapPlanID      string
+	swapOldID       string
+	swapNewRecipe   *domain.Recipe
+	swapItems       []domain.ShoppingListItem
 }
 
-func (r *fakeGenRepo) RecentRecipes(_ context.Context, _ string, _ int) ([]domain.Recipe, error) {
+func (r *fakeGenRepo) RecentRecipes(_ context.Context, _ string, limit int) ([]domain.Recipe, error) {
+	r.recentLimitSeen = limit
 	return r.recent, nil
 }
 
@@ -383,6 +385,62 @@ func TestGenerateWeekIncludesHistoryInPrompt(t *testing.T) {
 	}
 	if !strings.Contains(llmClient.lastSystem, "ruokaboksi") {
 		t.Errorf("system block missing few-shot examples")
+	}
+}
+
+func TestGenerateWeekRendersDislikedHistory(t *testing.T) {
+	repo := &fakeGenRepo{
+		recent: []domain.Recipe{
+			{Title: "Liver Casserole", Feedback: &domain.Feedback{Disliked: true}},
+		},
+	}
+	llmClient := &capturingLLM{reply: validWeek()}
+	svc := newTestGenService(llmClient, repo)
+
+	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(llmClient.lastPrompt, "Liver Casserole") {
+		t.Errorf("trigger missing disliked recipe title:\n%s", llmClient.lastPrompt)
+	}
+	if !strings.Contains(llmClient.lastPrompt, "do not make this again") {
+		t.Errorf("trigger missing disliked do-not-repeat instruction:\n%s", llmClient.lastPrompt)
+	}
+}
+
+func TestGenerateWeekDefaultRecentLimit(t *testing.T) {
+	repo := &fakeGenRepo{}
+	svc := newTestGenService(&fakeLLM{replies: []string{validWeek()}}, repo)
+
+	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if repo.recentLimitSeen != defaultRecentLimit {
+		t.Fatalf("recentLimitSeen = %d, want default %d", repo.recentLimitSeen, defaultRecentLimit)
+	}
+}
+
+func TestGenerateWeekUsesConfiguredRecentLimit(t *testing.T) {
+	repo := &fakeGenRepo{}
+	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo, &fakeBuilder{}, WithRecentLimit(20))
+
+	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if repo.recentLimitSeen != 20 {
+		t.Fatalf("recentLimitSeen = %d, want 20", repo.recentLimitSeen)
+	}
+}
+
+func TestWithRecentLimitIgnoresNonPositive(t *testing.T) {
+	repo := &fakeGenRepo{}
+	svc := NewGenerationService(&fakeLLM{replies: []string{validWeek()}}, repo, &fakeBuilder{}, WithRecentLimit(0))
+
+	if _, err := svc.GenerateWeek(context.Background(), testHousehold()); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if repo.recentLimitSeen != defaultRecentLimit {
+		t.Fatalf("recentLimitSeen = %d, want default %d (non-positive ignored)", repo.recentLimitSeen, defaultRecentLimit)
 	}
 }
 
