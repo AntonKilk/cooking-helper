@@ -92,6 +92,22 @@ func (s *HouseholdService) UpdateProfile(ctx context.Context, id string, lang do
 	return h, nil
 }
 
+// CompleteOnboarding marks the household as having finished (or skipped) the
+// first-run onboarding wizard, so the home screen stops redirecting to it. It is
+// idempotent: completing an already-onboarded household is a harmless re-write.
+func (s *HouseholdService) CompleteOnboarding(ctx context.Context, id string) (*domain.HouseholdProfile, error) {
+	h, err := s.repo.GetHousehold(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("complete onboarding: %w", err)
+	}
+
+	h.Onboarded = true
+	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
+		return nil, fmt.Errorf("complete onboarding: %w", err)
+	}
+	return h, nil
+}
+
 // AddDisliked appends a disliked ingredient to the household, trimming the term
 // and deduplicating case-insensitively. A blank term yields ErrEmptyIngredient.
 // Adding an already-present term is a no-op success (idempotent): the current

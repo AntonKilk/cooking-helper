@@ -98,6 +98,39 @@ func TestFirstHousehold(t *testing.T) {
 	}
 }
 
+func TestHouseholdOnboardedRoundTrip(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	h := &domain.HouseholdProfile{
+		Language:   domain.LanguageEN,
+		FamilySize: domain.FamilySize{Adults: 2, Kids: 0},
+	}
+	if err := store.CreateHousehold(ctx, h); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	got, err := store.GetHousehold(ctx, h.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Onboarded {
+		t.Fatal("a fresh household should default to not onboarded")
+	}
+
+	got.Onboarded = true
+	if err := store.UpdateHousehold(ctx, got); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	reloaded, err := store.GetHousehold(ctx, h.ID)
+	if err != nil {
+		t.Fatalf("get after update: %v", err)
+	}
+	if !reloaded.Onboarded {
+		t.Fatal("onboarded flag did not persist")
+	}
+}
+
 func TestHouseholdNotFound(t *testing.T) {
 	store := newTestStore(t)
 

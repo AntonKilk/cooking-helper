@@ -124,6 +124,36 @@ func TestUpdateProfilePersists(t *testing.T) {
 	}
 }
 
+func TestCompleteOnboarding(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewHouseholdService(repo)
+	ctx := context.Background()
+
+	h, err := svc.Current(ctx, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	if h.Onboarded {
+		t.Fatal("a fresh household should not be onboarded")
+	}
+
+	got, err := svc.CompleteOnboarding(ctx, h.ID)
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if !got.Onboarded {
+		t.Fatal("returned profile is not onboarded")
+	}
+	if !repo.rows[h.ID].Onboarded {
+		t.Fatal("onboarded flag was not persisted to the repository")
+	}
+
+	// Idempotent: completing again is a harmless success.
+	if _, err := svc.CompleteOnboarding(ctx, h.ID); err != nil {
+		t.Fatalf("second complete: %v", err)
+	}
+}
+
 func TestAddDisliked(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewHouseholdService(repo)
