@@ -36,12 +36,7 @@
 
   <section id="week" class="week" aria-live="polite"></section>
 
-  <section>
-    <h2>{{ t "shopping.categories_heading" }}</h2>
-    <ul>
-      {{- range .CategoryKeys }}
-      <li>{{ t . }}</li>
-      {{- end }}
-    </ul>
+  <section class="home-shopping">
+    <a href="/shopping" hx-get="/shopping" hx-target="#content" hx-push-url="true" class="home-shopping__link">{{ t "nav.shopping" }}</a>
   </section>
 {{- end -}}

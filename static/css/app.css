@@ -66,6 +66,23 @@ main {
   color: var(--text);
 }
 
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-header__shopping {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch);
+  padding: 0 0.75rem;
+  font-size: 1.125rem;
+  text-decoration: none;
+  color: var(--accent);
+}
+
 .app-header__settings {
   display: inline-flex;
   align-items: center;
@@ -220,4 +237,83 @@ html { -webkit-tap-highlight-color: transparent; }
     --text-muted: #C9BBA8;
     --border: #4A3C2E;
   }
+}
+
+/* Shopping list (CH-13 / F-3): category groups, check + remove rows. */
+.shopping__empty { font-size: 1.25rem; color: var(--text-muted); }
+.shopping__empty-hint { font-size: 1.125rem; }
+
+.shopping__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space);
+}
+
+.shopping__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  font-size: 1.125rem;
+  color: var(--text-muted);
+}
+
+.shopping-group { margin-bottom: var(--space); }
+
+.shopping-group__heading {
+  font-size: 1.5rem;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+
+.shopping-group__items { list-style: none; padding: 0; margin: 0; }
+
+.shopping-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+  min-height: var(--touch);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shopping-item__check {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: var(--touch);
+  cursor: pointer;
+}
+
+.shopping-item__check input { min-width: 1.5rem; min-height: 1.5rem; }
+
+.shopping-item__amount { font-weight: 600; }
+.shopping-item__unit { color: var(--text-muted); }
+
+.shopping-item--checked .shopping-item__text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.shopping-item__remove,
+.shopping-item__undo {
+  min-height: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.shopping-item--removed {
+  justify-content: space-between;
+  color: var(--text-muted);
+}
+
+.shopping-item__removed-label { font-style: italic; }
+
+/* "Show purchased" toggle: when off (default), hide checked rows. */
+.shopping-list:not(.shopping-list--show-purchased) .shopping-item--checked {
+  display: none;
 }

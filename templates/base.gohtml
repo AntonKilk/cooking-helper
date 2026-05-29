@@ -11,7 +11,10 @@
 {{- define "header" -}}
   <header class="app-header">
     <a href="/" hx-get="/" hx-target="#content" hx-push-url="true" class="app-header__title">{{ t "app.title" }}</a>
-    <a href="/settings" hx-get="/settings" hx-target="#content" hx-push-url="true" class="app-header__settings" aria-label="{{ t "nav.settings" }}">⚙</a>
+    <nav class="app-header__nav">
+      <a href="/shopping" hx-get="/shopping" hx-target="#content" hx-push-url="true" class="app-header__shopping">{{ t "nav.shopping" }}</a>
+      <a href="/settings" hx-get="/settings" hx-target="#content" hx-push-url="true" class="app-header__settings" aria-label="{{ t "nav.settings" }}">⚙</a>
+    </nav>
   </header>
 {{- end -}}
 
