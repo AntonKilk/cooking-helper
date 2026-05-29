@@ -14,9 +14,9 @@ import (
 // outside the supported range (adults 1-6, kids 0-6).
 var ErrInvalidFamilySize = errors.New("service: family size out of range")
 
-// ErrEmptyIngredient is returned when an empty or whitespace-only ingredient is
-// submitted to AddDisliked.
-var ErrEmptyIngredient = errors.New("service: ingredient is empty")
+// ErrEmptyIngredient is returned when an add (pantry basic or disliked) carries
+// only whitespace.
+var ErrEmptyIngredient = errors.New("service: empty ingredient")
 
 // Family size bounds enforced on every profile update. Defaults seed a brand-new
 // household on first access.
@@ -56,8 +56,9 @@ func (s *HouseholdService) Current(ctx context.Context, defaultLang domain.Langu
 	h, err := s.repo.FirstHousehold(ctx)
 	if errors.Is(err, repository.ErrNotFound) {
 		h = &domain.HouseholdProfile{
-			Language:   defaultLang,
-			FamilySize: domain.FamilySize{Adults: defaultAdults, Kids: defaultKids},
+			Language:     defaultLang,
+			FamilySize:   domain.FamilySize{Adults: defaultAdults, Kids: defaultKids},
+			PantryBasics: domain.DefaultPantryBasics(defaultLang),
 		}
 		if err := s.repo.CreateHousehold(ctx, h); err != nil {
 			return nil, fmt.Errorf("current household: %w", err)
@@ -141,6 +142,61 @@ func (s *HouseholdService) RemoveDisliked(ctx context.Context, id, term string) 
 
 	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
 		return nil, fmt.Errorf("remove disliked: %w", err)
+	}
+	return h, nil
+}
+
+// AddPantryBasic appends a staple to the household's pantry-basics list and
+// persists it. The item is trimmed; an all-whitespace item yields
+// ErrEmptyIngredient. A case-insensitive duplicate is ignored, leaving the list
+// unchanged. The updated profile is returned.
+func (s *HouseholdService) AddPantryBasic(ctx context.Context, id, item string) (*domain.HouseholdProfile, error) {
+	item = strings.TrimSpace(item)
+	if item == "" {
+		return nil, ErrEmptyIngredient
+	}
+
+	h, err := s.repo.GetHousehold(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("add pantry basic: %w", err)
+	}
+
+	for _, existing := range h.PantryBasics {
+		if strings.EqualFold(strings.TrimSpace(existing), item) {
+			return h, nil
+		}
+	}
+
+	h.PantryBasics = append(h.PantryBasics, item)
+	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
+		return nil, fmt.Errorf("add pantry basic: %w", err)
+	}
+	return h, nil
+}
+
+// RemovePantryBasic drops the case-insensitive match of item from the household's
+// pantry-basics list and persists the result. Removing an absent item is a no-op
+// (still persisted), keeping the operation idempotent. The updated profile is
+// returned.
+func (s *HouseholdService) RemovePantryBasic(ctx context.Context, id, item string) (*domain.HouseholdProfile, error) {
+	item = strings.TrimSpace(item)
+
+	h, err := s.repo.GetHousehold(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("remove pantry basic: %w", err)
+	}
+
+	kept := make([]string, 0, len(h.PantryBasics))
+	for _, existing := range h.PantryBasics {
+		if strings.EqualFold(strings.TrimSpace(existing), item) {
+			continue
+		}
+		kept = append(kept, existing)
+	}
+	h.PantryBasics = kept
+
+	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
+		return nil, fmt.Errorf("remove pantry basic: %w", err)
 	}
 	return h, nil
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/AntonKilk/cooking-helper/internal/domain"
@@ -65,6 +66,15 @@ func TestCurrentCreatesDefaults(t *testing.T) {
 	}
 	if len(repo.rows) != 1 {
 		t.Fatalf("rows = %d, want 1", len(repo.rows))
+	}
+	want := domain.DefaultPantryBasics(domain.LanguageFI)
+	if len(h.PantryBasics) != len(want) {
+		t.Fatalf("pantry basics = %v, want %v", h.PantryBasics, want)
+	}
+	for i, term := range want {
+		if h.PantryBasics[i] != term {
+			t.Fatalf("pantry basics = %v, want %v", h.PantryBasics, want)
+		}
 	}
 }
 
@@ -221,5 +231,92 @@ func TestUpdateProfileRejectsOutOfRange(t *testing.T) {
 				t.Fatalf("family mutated to %+v on invalid input", repo.rows[h.ID].FamilySize)
 			}
 		})
+	}
+}
+
+func TestAddPantryBasicAppendsAndDedupes(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewHouseholdService(repo)
+	ctx := context.Background()
+
+	h, err := svc.Current(ctx, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	base := len(h.PantryBasics)
+
+	added, err := svc.AddPantryBasic(ctx, h.ID, "  Olive Oil  ")
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if len(added.PantryBasics) != base+1 {
+		t.Fatalf("len = %d, want %d", len(added.PantryBasics), base+1)
+	}
+	if last := added.PantryBasics[len(added.PantryBasics)-1]; last != "Olive Oil" {
+		t.Fatalf("appended %q, want trimmed %q", last, "Olive Oil")
+	}
+
+	deduped, err := svc.AddPantryBasic(ctx, h.ID, "olive oil")
+	if err != nil {
+		t.Fatalf("add dup: %v", err)
+	}
+	if len(deduped.PantryBasics) != base+1 {
+		t.Fatalf("duplicate added: len = %d, want %d", len(deduped.PantryBasics), base+1)
+	}
+	if len(repo.rows[h.ID].PantryBasics) != base+1 {
+		t.Fatalf("not persisted: repo len = %d, want %d", len(repo.rows[h.ID].PantryBasics), base+1)
+	}
+}
+
+func TestAddPantryBasicRejectsEmpty(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewHouseholdService(repo)
+	ctx := context.Background()
+
+	h, err := svc.Current(ctx, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	base := len(h.PantryBasics)
+
+	if _, err := svc.AddPantryBasic(ctx, h.ID, "   "); !errors.Is(err, ErrEmptyIngredient) {
+		t.Fatalf("err = %v, want ErrEmptyIngredient", err)
+	}
+	if len(repo.rows[h.ID].PantryBasics) != base {
+		t.Fatalf("list mutated on empty input: len = %d, want %d", len(repo.rows[h.ID].PantryBasics), base)
+	}
+}
+
+func TestRemovePantryBasicCaseInsensitive(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewHouseholdService(repo)
+	ctx := context.Background()
+
+	h, err := svc.Current(ctx, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	if _, err := svc.AddPantryBasic(ctx, h.ID, "Olive Oil"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+
+	removed, err := svc.RemovePantryBasic(ctx, h.ID, "OLIVE OIL")
+	if err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	for _, term := range removed.PantryBasics {
+		if strings.EqualFold(term, "olive oil") {
+			t.Fatalf("item not removed: %v", removed.PantryBasics)
+		}
+	}
+
+	// Removing an absent item is a no-op, not an error.
+	before := len(removed.PantryBasics)
+	again, err := svc.RemovePantryBasic(ctx, h.ID, "not present")
+	if err != nil {
+		t.Fatalf("remove absent: %v", err)
+	}
+	if len(again.PantryBasics) != before {
+		t.Fatalf("absent removal changed list: len = %d, want %d", len(again.PantryBasics), before)
 	}
 }
