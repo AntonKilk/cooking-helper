@@ -44,7 +44,7 @@ unconditionally, so it works even when no LLM client is configured.
 | `go test ./...` | ✅ all packages pass (verified on go1.26.3) |
 | Static `CGO_ENABLED=0` build | ✅ |
 | Live binary HTTP smoke (`/shopping`, `/`, `/healthz`) | ✅ |
-| `govulncheck ./...` | ⚠️ ran locally — 9 findings, **all Go stdlib**, none in CH-13 code or called deps; remediated by pinning toolchain go1.26.3 (see below) |
+| `govulncheck ./...` | ✅ clean — `No vulnerabilities found` (locally, on go1.26.3 after the toolchain bump) |
 
 ## Files Changed
 
@@ -88,7 +88,6 @@ unconditionally, so it works even when no LLM client is configured.
 |------|-----|----------------|
 | Service-Worker offline replay of checkbox writes | `static/sw.js` is GET-only; no POST queue/Background-Sync built | Future SW work; tailnet HTTPS / CH-21. Server contract (idempotent writes) is delivered and tested. |
 | Real-browser HTMX swap / touch-target smoke | needs running server + Safari | tailnet HTTPS / Mac mini |
-| `govulncheck` final clean re-run | `vuln.go.dev` 403 in sandbox | Re-run locally after the toolchain bump (auto-switches to go1.26.3) to confirm `No vulnerabilities found` |
 
 ### govulncheck — resolved (toolchain bump)
 
@@ -106,9 +105,8 @@ is now pinned:
 - `Dockerfile` — build stage bumped to `golang:1.26.3-alpine`
 
 Verified in-sandbox: `go build ./...`, `go vet ./...`, `gofmt -s -l .`, and
-`go test ./...` all pass on go1.26.3. The final `govulncheck` clean verdict must be
-re-run locally (sandbox `vuln.go.dev` returns 403) — it will auto-switch to go1.26.3
-and should report no findings.
+`go test ./...` all pass on go1.26.3. **Confirmed locally: `govulncheck ./...` reports
+`No vulnerabilities found`** on go1.26.3.
 
 ## Tests Written
 
