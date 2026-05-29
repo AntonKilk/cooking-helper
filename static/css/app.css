@@ -6,7 +6,8 @@
   --surface: #FCFAF5;   /* ivory */
   --text: #2B2118;      /* deep oak */
   --text-muted: #6B5F52;/* muted brown */
-  --accent: #C2603A;    /* terracotta */
+  --accent: #C2603A;    /* terracotta — decorative / large text only */
+  --accent-text: #A84B28;/* darker terracotta — AA-safe for body links & button labels (≥4.5:1 on cream/ivory) */
   --success: #5C7A4E;   /* moss green */
   --border: #E5DBC9;    /* soft sand */
 
@@ -39,7 +40,7 @@ h1, h2, h3 {
 h1 { font-size: 2.25rem; } /* ≥24pt headings */
 h2 { font-size: 1.75rem; }
 
-a { color: var(--accent); }
+a { color: var(--accent-text); }
 
 main {
   display: block;
@@ -66,6 +67,24 @@ main {
   color: var(--text);
 }
 
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-header__shopping,
+.app-header__archive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch);
+  padding: 0 0.75rem;
+  font-size: 1.125rem;
+  text-decoration: none;
+  color: var(--accent-text);
+}
+
 .app-header__settings {
   display: inline-flex;
   align-items: center;
@@ -74,7 +93,7 @@ main {
   min-height: var(--touch);
   font-size: 1.5rem;
   text-decoration: none;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Touch-friendly controls: ≥44px targets, no hover-only interactions. */
@@ -101,6 +120,117 @@ input,
   border-radius: 8px;
 }
 
+/* Fullscreen recipe view (CH-11 / F-4): override the centered max-width so the
+   ingredients + steps grid can use the full iPad screen on landscape. */
+main:has(> .recipe) { max-width: none; }
+
+.recipe { display: block; }
+
+.recipe__back {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 0 0.75rem;
+  margin-bottom: var(--space);
+  font-size: 1.125rem;
+  text-decoration: none;
+  color: var(--accent-text);
+}
+
+.recipe__title { font-size: 2.5rem; margin-bottom: 0.25em; }
+
+.recipe__meta {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5em;
+}
+
+.recipe__desc { font-size: 1.25rem; margin-bottom: var(--space); }
+
+.recipe__grid {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: 1fr;
+}
+
+@media (orientation: landscape) and (min-width: 900px) {
+  .recipe__grid { grid-template-columns: 1fr 1.4fr; }
+}
+
+.recipe__ingredient-list { list-style: none; padding: 0; margin: 0; }
+
+.recipe__ingredient {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.25rem;
+}
+
+.recipe__amount { font-weight: 600; }
+.recipe__unit { color: var(--text-muted); }
+.recipe__ingredient-name { flex: 1; }
+
+.recipe__step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: recipe-step;
+}
+
+.recipe-step {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 12px;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.recipe-step[aria-current="step"] {
+  background: var(--surface);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.recipe-step__body { flex: 1; }
+
+.recipe-step__label {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  margin: 0 0 0.25em;
+  color: var(--text-muted);
+}
+
+.recipe-step__text { margin: 0; font-size: 1.25rem; line-height: 1.5; }
+
+.recipe-step[data-done="true"] .recipe-step__text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.recipe-step__toggle {
+  min-height: var(--touch);
+  min-width: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.recipe-step[data-done="true"] .recipe-step__toggle {
+  background: var(--success);
+  color: var(--surface);
+  border-color: var(--success);
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #2B2118;
@@ -108,5 +238,381 @@ input,
     --text: #F5EFE6;
     --text-muted: #C9BBA8;
     --border: #4A3C2E;
+    /* Inverted Nordic Kitchen: lighten warm accents so links and active-button
+       fills clear WCAG AA against the dark oak background (≥4.5:1). */
+    --accent: #D17A4D;
+    --accent-text: #D17A4D;
+    --success: #8FB07E;
   }
 }
+
+/* Shopping list (CH-13 / F-3): category groups, check + remove rows. */
+.shopping__empty { font-size: 1.25rem; color: var(--text-muted); }
+.shopping__empty-hint { font-size: 1.125rem; }
+
+.shopping__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space);
+}
+
+.shopping__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  font-size: 1.125rem;
+  color: var(--text-muted);
+}
+
+.shopping-group { margin-bottom: var(--space); }
+
+.shopping-group__heading {
+  font-size: 1.5rem;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+
+.shopping-group__items { list-style: none; padding: 0; margin: 0; }
+
+.shopping-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+  min-height: var(--touch);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shopping-item__check {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: var(--touch);
+  cursor: pointer;
+}
+
+.shopping-item__check input { min-width: 1.5rem; min-height: 1.5rem; }
+
+.shopping-item__amount { font-weight: 600; }
+.shopping-item__unit { color: var(--text-muted); }
+
+.shopping-item--checked .shopping-item__text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.shopping-item__remove,
+.shopping-item__undo {
+  min-height: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.shopping-item--removed {
+  justify-content: space-between;
+  color: var(--text-muted);
+}
+
+.shopping-item__removed-label { font-style: italic; }
+
+/* "Show purchased" toggle: when off (default), hide checked rows. */
+.shopping-list:not(.shopping-list--show-purchased) .shopping-item--checked {
+  display: none;
+}
+
+/* Recipe feedback (CH-16 / F-5): integrated like / dislike / cook-again toggles,
+   shared by the recipe detail view and the week cards. */
+.recipe__feedback { margin: var(--space) 0; }
+
+.recipe__feedback-heading {
+  font-size: 1.25rem;
+  margin: 0 0 0.5em;
+  color: var(--text-muted);
+}
+
+.feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+/* The native checkbox drives the accessible state; the label is the touch
+   target, styled as a button. */
+.feedback__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Hide the native box but keep it focusable for keyboard + screen readers. */
+.feedback__btn input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.feedback__icon { font-size: 1.5rem; line-height: 1; }
+
+.feedback__btn--active {
+  background: var(--accent-text);
+  color: var(--bg);
+  border-color: var(--accent-text);
+}
+
+/* Keyboard focus ring on the label when its checkbox is focused. */
+.feedback__btn:focus-within {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   CH-20 iPad polish: shared form/button defaults, safe-area insets, and the
+   component styles for views that previously rendered with no CSS (home /
+   week cards / archive / disliked / pantry). Built on the existing tokens.
+   --------------------------------------------------------------------------- */
+
+/* Safe-area insets so content clears the iPad landscape home indicator and any
+   rounded corners when installed as a standalone PWA. */
+.app-header {
+  padding-top: max(var(--space), env(safe-area-inset-top));
+  padding-left: max(var(--space), env(safe-area-inset-left));
+  padding-right: max(var(--space), env(safe-area-inset-right));
+}
+
+main {
+  padding-left: max(var(--space), env(safe-area-inset-left));
+  padding-right: max(var(--space), env(safe-area-inset-right));
+  padding-bottom: max(var(--space), env(safe-area-inset-bottom));
+}
+
+/* HTMX ships no stylesheet here (we self-host the JS only), so define the
+   indicator behavior: hidden until the triggering element is mid-request. */
+.htmx-indicator { opacity: 0; transition: opacity 0.2s ease; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { opacity: 1; }
+
+/* Visible keyboard focus everywhere, on the AA-safe accent. */
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* Text inputs — styled to match the cards instead of the browser default. */
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Default (secondary) button: surface fill, AA-safe accent label. Buttons that
+   set their own background (recipe-step toggle, shopping remove) override this. */
+button {
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Primary action buttons: filled terracotta with background-colored label. */
+.generate__button,
+.week__regenerate,
+.archive-item__cook-again {
+  background: var(--accent-text);
+  color: var(--bg);
+  border-color: var(--accent-text);
+}
+
+/* Home — generation trigger + shortcut. */
+.generate { margin: var(--space) 0; }
+
+.generate__button { font-size: 1.375rem; padding: 0.75rem 1.5rem; }
+
+.generate__hint,
+.generate__indicator {
+  margin: 0.75rem 0 0;
+  font-size: 1.125rem;
+  color: var(--text-muted);
+}
+
+.home-shopping { margin-top: var(--space); }
+
+/* Weekly menu cards. */
+.week { margin-top: var(--space); }
+.week__heading { margin-top: 0; }
+
+.week__cards {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space);
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .week__cards { grid-template-columns: repeat(3, 1fr); }
+}
+
+.recipe-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: var(--space);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.recipe-card__link {
+  display: block;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.recipe-card__emoji { font-size: 2.5rem; line-height: 1; }
+.recipe-card__title { font-size: 1.5rem; margin: 0.25rem 0; }
+.recipe-card__time { margin: 0; color: var(--text-muted); font-size: 1.125rem; }
+.recipe-card__desc { margin: 0.25rem 0 0; font-size: 1.125rem; }
+
+.recipe-card__swap { align-self: flex-start; min-height: var(--touch); }
+
+.week__regenerate {
+  min-height: var(--touch);
+  padding: 0 1.5rem;
+  font-size: 1.25rem;
+}
+
+.week__error { color: var(--accent-text); font-size: 1.25rem; }
+
+/* Archive — search + result cards + cook-again dialog. */
+.archive-search { margin-bottom: var(--space); font-size: 1.25rem; min-height: var(--touch); }
+
+.archive-list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space); }
+
+.archive-list__empty,
+.archive-list__error { color: var(--text-muted); font-size: 1.25rem; }
+.archive-list__error { color: var(--accent-text); }
+
+.archive-item {
+  padding: var(--space);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.archive-item__link { display: block; text-decoration: none; color: var(--text); }
+.archive-item__title { font-size: 1.5rem; margin: 0 0 0.25rem; }
+.archive-item__time { margin: 0; color: var(--text-muted); font-size: 1.125rem; }
+.archive-item__desc { margin: 0.25rem 0 0; font-size: 1.125rem; }
+
+.archive-item__feedback { margin: 0.5rem 0; display: flex; gap: 0.5rem; }
+.archive-item__icon { font-size: 1.5rem; line-height: 1; }
+
+.archive-item__cook-again { min-height: var(--touch); margin-top: 0.5rem; }
+.archive-item__dialog:empty { display: none; }
+
+.archive-dialog { margin-top: 0.75rem; }
+.archive-dialog__heading { margin: 0 0 0.5rem; font-size: 1.125rem; color: var(--text-muted); }
+.archive-dialog__choices { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.archive-dialog__choices form { margin: 0; }
+.archive-dialog__choice { width: 100%; min-height: var(--touch); text-align: left; }
+.archive-dialog__empty { color: var(--text-muted); font-size: 1.125rem; }
+
+.archive-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space);
+  margin-top: 0.75rem;
+  font-size: 1.125rem;
+}
+
+.archive-error { margin-top: 0.75rem; color: var(--accent-text); font-size: 1.125rem; }
+
+/* Disliked ingredients + pantry basics — add form + removable chips. */
+.disliked-add,
+#pantry-list form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: var(--space);
+}
+
+.disliked-add label,
+#pantry-list label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 12rem;
+  font-size: 1.125rem;
+}
+
+.disliked-add button,
+#pantry-list > form > button {
+  min-height: var(--touch);
+}
+
+.disliked-list,
+.pantry-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.disliked-item,
+.pantry-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  min-height: var(--touch);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.disliked-item__name { flex: 1; }
+
+.disliked-item__remove,
+.pantry-items form {
+  margin: 0;
+}
+
+.disliked-item__remove button,
+.pantry-items form button {
+  min-height: var(--touch);
+}
+
+.disliked-list__empty { color: var(--text-muted); font-size: 1.125rem; padding: 0.5rem 0; }

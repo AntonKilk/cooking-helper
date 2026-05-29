@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,16 @@ func (s *Store) CreateRecipe(ctx context.Context, r *domain.Recipe) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
+	if err := insertRecipe(ctx, s.db, r); err != nil {
+		return fmt.Errorf("create recipe: %w", err)
+	}
+	return nil
+}
+
+// insertRecipe writes one recipe through any execer (*sql.DB or *sql.Tx),
+// assigning a UUID and timestamps when empty. Sharing it lets a single recipe
+// write and the atomic week write reuse one INSERT.
+func insertRecipe(ctx context.Context, ex execer, r *domain.Recipe) error {
 	if r.ID == "" {
 		r.ID = uuid.NewString()
 	}
@@ -35,12 +46,11 @@ func (s *Store) CreateRecipe(ctx context.Context, r *domain.Recipe) error {
 		 ingredients, steps, source, feedback_liked, feedback_disliked, feedback_cook_again,
 		 feedback_created_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err = s.db.ExecContext(ctx, q,
+	if _, err := ex.ExecContext(ctx, q,
 		r.ID, r.HouseholdID, string(r.Language), r.Title, r.Description,
 		r.CookTimeMinutes, r.Servings, ingredients, steps, string(r.Source),
-		liked, disliked, cookAgain, fbCreated, formatTime(r.CreatedAt), formatTime(r.UpdatedAt))
-	if err != nil {
-		return fmt.Errorf("create recipe: %w", err)
+		liked, disliked, cookAgain, fbCreated, formatTime(r.CreatedAt), formatTime(r.UpdatedAt)); err != nil {
+		return err
 	}
 	return nil
 }
@@ -55,6 +65,23 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		feedback_created_at, created_at, updated_at
 		FROM recipe WHERE id = ?`
 
+	r, err := scanRecipe(s.db.QueryRowContext(ctx, q, id))
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// recipeColumns is the SELECT list shared by every recipe read so the scan order
+// in scanRecipe stays in sync with the queries.
+const recipeColumns = `id, household_id, language, title, description, cook_time_minutes, servings,
+	ingredients, steps, source, feedback_liked, feedback_disliked, feedback_cook_again,
+	feedback_created_at, created_at, updated_at`
+
+// scanRecipe maps a recipe row (in recipeColumns order) into a domain Recipe,
+// decoding the JSON, feedback, and timestamp columns. It returns ErrNotFound when
+// the underlying query yielded no row.
+func scanRecipe(row rowScanner) (*domain.Recipe, error) {
 	var (
 		r                  domain.Recipe
 		language, source   string
@@ -64,7 +91,7 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		fbCreated          sql.NullString
 		createdAt, updated string
 	)
-	err := s.db.QueryRowContext(ctx, q, id).Scan(
+	err := row.Scan(
 		&r.ID, &r.HouseholdID, &language, &r.Title, &r.Description,
 		&r.CookTimeMinutes, &r.Servings, &ingredients, &steps, &source,
 		&liked, &disliked, &cookAgain, &fbCreated, &createdAt, &updated)
@@ -72,7 +99,7 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		return nil, ErrNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get recipe: %w", err)
+		return nil, fmt.Errorf("scan recipe: %w", err)
 	}
 
 	r.Language = domain.Language(language)
@@ -93,6 +120,130 @@ func (s *Store) GetRecipe(ctx context.Context, id string) (*domain.Recipe, error
 		return nil, err
 	}
 	return &r, nil
+}
+
+// RecentRecipes loads up to limit of the household's most recently created
+// recipes, newest first. It feeds the generation prompt with week history and
+// recent feedback.
+func (s *Store) RecentRecipes(ctx context.Context, householdID string, limit int) ([]domain.Recipe, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	q := `SELECT ` + recipeColumns + `
+		FROM recipe WHERE household_id = ? ORDER BY created_at DESC LIMIT ?`
+
+	rows, err := s.db.QueryContext(ctx, q, householdID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("recent recipes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var recipes []domain.Recipe
+	for rows.Next() {
+		r, err := scanRecipe(rows)
+		if err != nil {
+			return nil, err
+		}
+		recipes = append(recipes, *r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recent recipes: %w", err)
+	}
+	return recipes, nil
+}
+
+// SearchRecipes loads up to limit of the household's recipes whose title contains
+// query (case-insensitive ASCII substring), newest first. An empty query matches
+// every recipe, so the same method backs both the full archive list and the
+// search-as-you-type fragment. The query is matched as a literal substring: LIKE
+// wildcards in the user's input are escaped, never interpreted.
+func (s *Store) SearchRecipes(ctx context.Context, householdID, query string, limit int) ([]domain.Recipe, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	pattern := "%" + escapeLike(strings.TrimSpace(query)) + "%"
+
+	q := `SELECT ` + recipeColumns + `
+		FROM recipe WHERE household_id = ? AND title LIKE ? ESCAPE '\'
+		ORDER BY created_at DESC LIMIT ?`
+
+	rows, err := s.db.QueryContext(ctx, q, householdID, pattern, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search recipes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var recipes []domain.Recipe
+	for rows.Next() {
+		r, err := scanRecipe(rows)
+		if err != nil {
+			return nil, err
+		}
+		recipes = append(recipes, *r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate search recipes: %w", err)
+	}
+	return recipes, nil
+}
+
+// escapeLike escapes the SQL LIKE metacharacters in s so user input is matched
+// literally under `ESCAPE '\'`. The backslash itself is escaped first so the
+// later replacements do not double-escape it.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "%", `\%`)
+	s = strings.ReplaceAll(s, "_", `\_`)
+	return s
+}
+
+// RecipesByIDs loads the recipes whose IDs are in ids, preserving the requested
+// order. Returns ErrNotFound if any id is missing — callers (e.g. the swap
+// service loading the two kept recipes) need all of them to proceed. An empty
+// input yields an empty slice.
+func (s *Store) RecipesByIDs(ctx context.Context, ids []string) ([]domain.Recipe, error) {
+	if len(ids) == 0 {
+		return []domain.Recipe{}, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1]
+	q := `SELECT ` + recipeColumns + ` FROM recipe WHERE id IN (` + placeholders + `)`
+
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("recipes by ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	byID := make(map[string]domain.Recipe, len(ids))
+	for rows.Next() {
+		r, err := scanRecipe(rows)
+		if err != nil {
+			return nil, err
+		}
+		byID[r.ID] = *r
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recipes by ids: %w", err)
+	}
+
+	out := make([]domain.Recipe, len(ids))
+	for i, id := range ids {
+		r, ok := byID[id]
+		if !ok {
+			return nil, ErrNotFound
+		}
+		out[i] = r
+	}
+	return out, nil
 }
 
 // UpdateRecipe overwrites a recipe (including feedback) and bumps updated_at.

@@ -1,0 +1,31 @@
+{{- define "generate/cards" -}}
+  <h2 class="week__heading">{{ t "home.week_heading" }}</h2>
+  <ul class="week__cards">
+    {{- range .Cards }}
+    <li class="recipe-card">
+      <a class="recipe-card__link" href="/recipe/{{ .ID }}" hx-get="/recipe/{{ .ID }}" hx-target="#content" hx-push-url="true">
+        <span class="recipe-card__emoji" aria-hidden="true">{{ .Emoji }}</span>
+        <h3 class="recipe-card__title">{{ .Title }}</h3>
+        <p class="recipe-card__time">{{ t "recipe.cook_time" .CookTime }}</p>
+        <p class="recipe-card__desc">{{ .Description }}</p>
+      </a>
+      {{ template "recipe/feedback" .Feedback }}
+      <button type="button" class="recipe-card__swap"
+              hx-post="/generate/swap/{{ .ID }}"
+              hx-target="#week"
+              hx-indicator="#generate-indicator">
+        {{ t "recipe.replace" }}
+      </button>
+    </li>
+    {{- end }}
+  </ul>
+  <button type="button" class="week__regenerate"
+          hx-post="/generate" hx-target="#week"
+          hx-indicator="#generate-indicator">
+    {{ t "home.regenerate_all" }}
+  </button>
+{{- end -}}
+
+{{- define "generate/error" -}}
+  <p class="week__error" role="alert">{{ t .MessageKey }}</p>
+{{- end -}}

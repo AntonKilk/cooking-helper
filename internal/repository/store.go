@@ -24,6 +24,12 @@ func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
+// execer is the write surface shared by *sql.DB and *sql.Tx, letting a single
+// INSERT helper run either standalone or inside a transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 // withTx runs fn inside a transaction, committing on success and rolling back on
 // error or panic. Used for atomic multi-table writes.
 func (s *Store) withTx(ctx context.Context, fn func(*sql.Tx) error) (err error) {

@@ -35,11 +35,11 @@ func (s *Store) CreateHousehold(ctx context.Context, h *domain.HouseholdProfile)
 	}
 
 	const q = `INSERT INTO household_profile
-		(id, language, family_adults, family_kids, disliked_ingredients, pantry_basics, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		(id, language, family_adults, family_kids, disliked_ingredients, pantry_basics, onboarded, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err = s.db.ExecContext(ctx, q,
 		h.ID, string(h.Language), h.FamilySize.Adults, h.FamilySize.Kids,
-		disliked, pantry, formatTime(h.CreatedAt), formatTime(h.UpdatedAt))
+		disliked, pantry, boolToInt(h.Onboarded), formatTime(h.CreatedAt), formatTime(h.UpdatedAt))
 	if err != nil {
 		return fmt.Errorf("create household: %w", err)
 	}
@@ -48,7 +48,15 @@ func (s *Store) CreateHousehold(ctx context.Context, h *domain.HouseholdProfile)
 
 // householdColumns is the SELECT list shared by every household read so the scan
 // order in scanHousehold stays in sync with the queries.
-const householdColumns = `id, language, family_adults, family_kids, disliked_ingredients, pantry_basics, created_at, updated_at`
+const householdColumns = `id, language, family_adults, family_kids, disliked_ingredients, pantry_basics, onboarded, created_at, updated_at`
+
+// boolToInt maps a Go bool onto SQLite's integer boolean convention (0/1).
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 // rowScanner is satisfied by *sql.Row and *sql.Rows, letting scanHousehold serve
 // both single-row and result-set queries.
@@ -64,11 +72,12 @@ func scanHousehold(row rowScanner) (*domain.HouseholdProfile, error) {
 		h                  domain.HouseholdProfile
 		language           string
 		disliked, pantry   string
+		onboarded          int
 		createdAt, updated string
 	)
 	err := row.Scan(
 		&h.ID, &language, &h.FamilySize.Adults, &h.FamilySize.Kids,
-		&disliked, &pantry, &createdAt, &updated)
+		&disliked, &pantry, &onboarded, &createdAt, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -77,6 +86,7 @@ func scanHousehold(row rowScanner) (*domain.HouseholdProfile, error) {
 	}
 
 	h.Language = domain.Language(language)
+	h.Onboarded = onboarded != 0
 	if h.DislikedIngredients, err = decodeStrings(disliked); err != nil {
 		return nil, err
 	}
@@ -129,11 +139,11 @@ func (s *Store) UpdateHousehold(ctx context.Context, h *domain.HouseholdProfile)
 	}
 
 	const q = `UPDATE household_profile
-		SET language = ?, family_adults = ?, family_kids = ?, disliked_ingredients = ?, pantry_basics = ?, updated_at = ?
+		SET language = ?, family_adults = ?, family_kids = ?, disliked_ingredients = ?, pantry_basics = ?, onboarded = ?, updated_at = ?
 		WHERE id = ?`
 	res, err := s.db.ExecContext(ctx, q,
 		string(h.Language), h.FamilySize.Adults, h.FamilySize.Kids,
-		disliked, pantry, formatTime(h.UpdatedAt), h.ID)
+		disliked, pantry, boolToInt(h.Onboarded), formatTime(h.UpdatedAt), h.ID)
 	if err != nil {
 		return fmt.Errorf("update household: %w", err)
 	}

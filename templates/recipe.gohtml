@@ -10,6 +10,7 @@
     {{ template "recipe/content" . }}
   </main>
   <script src="/static/js/htmx.min.js"></script>
+  <script src="/static/js/cooking-steps.js" defer></script>
   {{ template "sw-register" . }}
 </body>
 </html>
@@ -20,7 +21,91 @@
   <h1>{{ t "recipe.heading" }}</h1>
   <p role="alert">{{ t "recipe.not_found" }}</p>
   {{- else }}
-  <h1>{{ t "recipe.heading" }}</h1>
-  <p>{{ .ID }}</p>
+  <article class="recipe">
+    <a href="/" hx-get="/" hx-target="#content" hx-push-url="true" class="recipe__back">{{ t "recipe.back" }}</a>
+    <h1 class="recipe__title">{{ .Recipe.Title }}</h1>
+    <p class="recipe__meta">{{ t "recipe.cook_time" .Recipe.CookTime }} · {{ t "recipe.servings" .Recipe.Servings }}</p>
+    {{- if .Recipe.Description }}
+    <p class="recipe__desc">{{ .Recipe.Description }}</p>
+    {{- end }}
+
+    <section class="recipe__feedback" aria-labelledby="recipe-feedback-heading">
+      <h2 id="recipe-feedback-heading" class="recipe__feedback-heading">{{ t "recipe.feedback_heading" }}</h2>
+      {{ template "recipe/feedback" .Recipe.Feedback }}
+    </section>
+
+    <div class="recipe__grid">
+      <section class="recipe__ingredients" aria-labelledby="recipe-ingredients-heading">
+        <h2 id="recipe-ingredients-heading">{{ t "recipe.ingredients_heading" }}</h2>
+        <ul class="recipe__ingredient-list">
+          {{- range .Recipe.Ingredients }}
+          <li class="recipe__ingredient">
+            {{- if .Amount }}<span class="recipe__amount">{{ .Amount }}</span>{{ end }}
+            {{- if .Unit }} <span class="recipe__unit">{{ .Unit }}</span>{{ end }}
+            <span class="recipe__ingredient-name">{{ .Name }}</span>
+          </li>
+          {{- end }}
+        </ul>
+      </section>
+
+      <section class="recipe__steps" aria-labelledby="recipe-steps-heading">
+        <h2 id="recipe-steps-heading">{{ t "recipe.steps_heading" }}</h2>
+        <ol class="recipe__step-list" data-recipe-id="{{ .Recipe.ID }}">
+          {{- range $i, $step := .Recipe.Steps }}
+          <li class="recipe-step" data-step-index="{{ $i }}">
+            <div class="recipe-step__body">
+              <p class="recipe-step__label">{{ t "recipe.step_label" (add $i 1) }}</p>
+              <p class="recipe-step__text">{{ $step }}</p>
+            </div>
+            <button type="button" class="recipe-step__toggle" aria-pressed="false">{{ t "recipe.mark_done" }}</button>
+          </li>
+          {{- end }}
+        </ol>
+      </section>
+    </div>
+  </article>
   {{- end }}
+{{- end -}}
+
+{{- /*
+  recipe/feedback renders the integrated like / dislike / cook-again control
+  (F-5 / CH-16). It takes a feedbackView. Each checkbox posts the ABSOLUTE state
+  of all three flags (via hx-include) so the write is idempotent and a
+  Service-Worker replay is a safe no-op. The whole control is swapped out on
+  every change, reflecting the persisted state. Shared by the recipe detail view
+  and the week cards.
+*/ -}}
+{{- define "recipe/feedback" -}}
+  <form class="feedback" data-recipe-id="{{ .RecipeID }}">
+    <label class="feedback__btn{{ if .Liked }} feedback__btn--active{{ end }}">
+      <input type="checkbox" name="liked" value="true" {{ if .Liked }}checked{{ end }}
+             hx-post="/recipe/{{ .RecipeID }}/feedback"
+             hx-trigger="change"
+             hx-include="closest .feedback"
+             hx-target="closest .feedback"
+             hx-swap="outerHTML">
+      <span class="feedback__icon" aria-hidden="true">👍</span>
+      <span class="feedback__label">{{ t "recipe.feedback_like" }}</span>
+    </label>
+    <label class="feedback__btn{{ if .Disliked }} feedback__btn--active{{ end }}">
+      <input type="checkbox" name="disliked" value="true" {{ if .Disliked }}checked{{ end }}
+             hx-post="/recipe/{{ .RecipeID }}/feedback"
+             hx-trigger="change"
+             hx-include="closest .feedback"
+             hx-target="closest .feedback"
+             hx-swap="outerHTML">
+      <span class="feedback__icon" aria-hidden="true">👎</span>
+      <span class="feedback__label">{{ t "recipe.feedback_dislike" }}</span>
+    </label>
+    <label class="feedback__btn{{ if .CookAgain }} feedback__btn--active{{ end }}">
+      <input type="checkbox" name="cook_again" value="true" {{ if .CookAgain }}checked{{ end }}
+             hx-post="/recipe/{{ .RecipeID }}/feedback"
+             hx-trigger="change"
+             hx-include="closest .feedback"
+             hx-target="closest .feedback"
+             hx-swap="outerHTML">
+      <span class="feedback__icon" aria-hidden="true">🔁</span>
+      <span class="feedback__label">{{ t "recipe.feedback_cook_again" }}</span>
+    </label>
+  </form>
 {{- end -}}

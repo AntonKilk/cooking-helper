@@ -19,12 +19,24 @@
   <h1>{{ t "home.heading" }}</h1>
   <p>{{ t "home.subtitle" }}</p>
 
-  <section>
-    <h2>{{ t "shopping.categories_heading" }}</h2>
-    <ul>
-      {{- range .CategoryKeys }}
-      <li>{{ t . }}</li>
-      {{- end }}
-    </ul>
+  <section class="generate">
+    {{- if .CanGenerate }}
+    <button type="button" class="generate__button"
+            hx-post="/generate" hx-target="#week" hx-indicator="#generate-indicator">
+      {{ t "home.generate" }}
+    </button>
+    <p id="generate-indicator" class="generate__indicator htmx-indicator">{{ t "home.generating" }}</p>
+    {{- else }}
+    <button type="button" class="generate__button" disabled aria-disabled="true">
+      {{ t "home.generate" }}
+    </button>
+    <p class="generate__hint">{{ t "home.generate_disabled" }}</p>
+    {{- end }}
+  </section>
+
+  <section id="week" class="week" aria-live="polite"></section>
+
+  <section class="home-shopping">
+    <a href="/shopping" hx-get="/shopping" hx-target="#content" hx-push-url="true" class="home-shopping__link">{{ t "nav.shopping" }}</a>
   </section>
 {{- end -}}

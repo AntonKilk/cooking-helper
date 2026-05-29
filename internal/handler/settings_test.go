@@ -21,6 +21,9 @@ func TestSettingsRendersProfileLinkAndLanguageSwitcher(t *testing.T) {
 	if !strings.Contains(body, `href="/settings/profile"`) {
 		t.Errorf("settings missing profile link:\n%s", body)
 	}
+	if !strings.Contains(body, `href="/settings/disliked"`) {
+		t.Errorf("settings missing disliked link:\n%s", body)
+	}
 	for _, lang := range []string{`value="ru"`, `value="fi"`, `value="en"`} {
 		if !strings.Contains(body, lang) {
 			t.Errorf("settings missing language button %s", lang)

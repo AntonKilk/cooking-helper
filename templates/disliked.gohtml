@@ -1,0 +1,57 @@
+{{- define "disliked/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "disliked/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "disliked/content" -}}
+  <h1>{{ t "disliked.heading" }}</h1>
+
+  {{- if .Error }}
+  <p role="alert">{{ t .Error }}</p>
+  {{- end }}
+
+  <form class="disliked-add" hx-post="/settings/disliked" hx-target="#disliked-list" hx-swap="outerHTML">
+    <label>{{ t "disliked.add_label" }}
+      <input type="text" name="ingredient" list="disliked-suggestions"
+             placeholder="{{ t "disliked.add_placeholder" }}" autocomplete="off" required>
+    </label>
+    <datalist id="disliked-suggestions">
+      {{- range .Suggestions }}
+      <option value="{{ . }}"></option>
+      {{- end }}
+    </datalist>
+    <button type="submit">{{ t "disliked.add_button" }}</button>
+  </form>
+
+  {{ template "disliked/list" . }}
+{{- end -}}
+
+{{- define "disliked/list" -}}
+  <ul id="disliked-list" class="disliked-list">
+    {{- if not .Items }}
+    <li class="disliked-list__empty">{{ t "disliked.empty" }}</li>
+    {{- else }}
+    {{- range .Items }}
+    <li class="disliked-item">
+      <span class="disliked-item__name">{{ . }}</span>
+      <form class="disliked-item__remove" hx-post="/settings/disliked/remove" hx-target="#disliked-list" hx-swap="outerHTML">
+        <input type="hidden" name="ingredient" value="{{ . }}">
+        <button type="submit" aria-label="{{ t "disliked.remove" }}">{{ t "disliked.remove" }}</button>
+      </form>
+    </li>
+    {{- end }}
+    {{- end }}
+  </ul>
+{{- end -}}

@@ -14,9 +14,13 @@ import (
 func noopT(key string, _ ...any) string { return key }
 
 // ParseFuncMap is the FuncMap templates must be parsed with so that {{ t ... }}
-// resolves at parse time. render then rebinds t to a per-request translator.
+// and {{ add ... }} resolve at parse time. render then rebinds t to a
+// per-request translator; add stays stable.
 func ParseFuncMap() template.FuncMap {
-	return template.FuncMap{"t": noopT}
+	return template.FuncMap{
+		"t":   noopT,
+		"add": func(a, b int) int { return a + b },
+	}
 }
 
 // renderer executes templates with a request-scoped t() bound to the active
@@ -53,6 +57,31 @@ func (rd *renderer) renderStatus(w http.ResponseWriter, r *http.Request, status 
 	var buf bytes.Buffer
 	if err := clone.ExecuteTemplate(&buf, name, data); err != nil {
 		rd.fail(w, r, "execute template", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = buf.WriteTo(w)
+}
+
+// renderFragment executes a specific named template (e.g. "generate/cards") with
+// the active language bound to t(), buffering first so a mid-render failure never
+// emits a half-written response. Used for HTMX partials that are not full
+// page/content pairs.
+func (rd *renderer) renderFragment(w http.ResponseWriter, r *http.Request, status int, name string, data any) {
+	lang := LanguageFromContext(r.Context())
+
+	clone, err := rd.tmpl.Clone()
+	if err != nil {
+		rd.fail(w, r, "clone template", err)
+		return
+	}
+	clone.Funcs(template.FuncMap{"t": rd.bundle.Translator(lang)})
+
+	var buf bytes.Buffer
+	if err := clone.ExecuteTemplate(&buf, name, data); err != nil {
+		rd.fail(w, r, "execute fragment", err)
 		return
 	}
 

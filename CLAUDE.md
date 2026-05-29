@@ -33,15 +33,25 @@ Full context: [`.agents/tech-design.md`](.agents/tech-design.md) and
 | **`html/template` + HTMX** | Server-side rendering. No SPA, no client-side model duplication. |
 | **SQLite** (`database/sql`, no ORM) | Single-file DB in a Docker volume. Single-writer is fine for one household. |
 | **`golang-migrate`** (or `goose`) | Schema migrations. Never edit schema by hand. |
-| **Anthropic Go SDK** | LLM calls behind a provider-agnostic `internal/llm` interface. |
+| **LLM SDKs (Anthropic + OpenAI)** | LLM calls behind a provider-agnostic `internal/llm` interface. Either provider plugs in; call sites stay provider-neutral. |
 | **`log/slog`** | Structured JSON logging (built-in, no external lib). |
 | **Docker + docker-compose** | Single container on Mac mini Intel i7. |
 | **Tailscale Serve** | HTTPS inside the tailnet only (HTTPS is required for Service Worker). No Funnel. |
 | **PWA** (manifest + Service Worker) | Install-to-home-screen on iPad, offline cache of generated recipes. |
 | **frontend-design skill** (dev-time only) | Generates HTML/CSS markup in the Nordic Kitchen design system. Not a runtime dependency. |
 
-**LLM models:** `claude-sonnet-4-6` for week generation / swap; `claude-haiku-4-5-20251001`
-for ingredient categorization and shopping-list normalization.
+**LLM models — selected by *role*, not by name.** Call sites request a role
+(`RoleGenerate` for week generation / swap; `RoleCategorize` for ingredient
+categorization and shopping-list normalization); each provider maps the role to a
+concrete model:
+
+| Role | Anthropic | OpenAI |
+|------|-----------|--------|
+| `RoleGenerate` | `claude-sonnet-4-6` | `gpt-5.4-mini` |
+| `RoleCategorize` | `claude-haiku-4-5-20251001` | `gpt-5.4-nano` |
+
+Switching provider never touches call sites — only the wired implementation
+(`internal/llm/anthropic` or `internal/llm/openai`) changes.
 
 ---
 
@@ -80,7 +90,7 @@ cooking-helper/
 │   ├── handler/           # HTTP handlers, grouped by feature
 │   ├── service/           # business logic, orchestration
 │   ├── repository/        # SQL access only
-│   ├── llm/               # provider-agnostic interface + anthropic/ impl + prompts/
+│   ├── llm/               # provider-agnostic interface + anthropic/ + openai/ impls + prompts/
 │   ├── i18n/              # ru/fi/en dictionaries + t() func
 │   └── shopping/          # ingredient consolidation + categorization
 ├── migrations/            # golang-migrate files
@@ -96,6 +106,10 @@ cooking-helper/
 - **Handler**: validates input, calls service, maps errors to HTTP responses / template data.
 
 Dependency direction: **handlers → services → repositories → domain. Never reverse.**
+
+**Wiring site**: dependencies (services, repositories, LLM client) are constructed and
+wired together in `internal/handler/router.go`, **not** in `cmd/server/main.go`. Add new
+routes and dependency wiring there.
 
 ### Domain-Driven Design
 - Group code by domain feature (`internal/shopping/`), not by technical layer.
@@ -113,8 +127,16 @@ Never write code for an integration without completing this checklist:
 3. **Still works** — verify the endpoint/version is live right now.
 4. **Fields are parseable** — confirm required fields are actually in the response.
 
-This applies directly to the **Anthropic API** (key required — already provisioned via
-`ANTHROPIC_API_KEY` env) and to the **Apple Reminders / Shortcuts** export in Phase 2.
+This applies directly to the **LLM provider API** — Anthropic (`ANTHROPIC_API_KEY`)
+or OpenAI (`OPENAI_API_KEY`), key required, provisioned via env — and to the
+**Apple Reminders / Shortcuts** export in Phase 2. Note: the web sandbox's egress
+allowlist **varies by session** — a provider host may be blocked
+(`x-deny-reason: host_not_allowed`) in one run and reachable in another (CH-8 ran a
+live OpenAI E2E in-sandbox with `OPENAI_API_KEY` set). **Re-check reachability at run
+time** (a quick probe, or the live attempt itself) before deciding to defer — do NOT
+skip a verifiable live LLM test on the strength of this note alone. Only defer to a
+networked host (Mac mini / dev machine) once you've confirmed the host is actually
+blocked or the key is absent in *this* run.
 
 ### Third-party libraries
 Before proposing a library: check it's actively maintained, compatible with the Go
@@ -142,16 +164,18 @@ Go structs.
   from services; never leak `sql`/HTTP details into the domain.
 
 ### LLM calls (`internal/llm`)
-- All calls go through the provider-agnostic `Client` interface — no direct SDK calls in handlers/services.
+- All calls go through the provider-agnostic `Client` interface — no direct SDK calls in handlers/services, no provider-specific model names at call sites.
+- **Select the model by `Role`** (`RoleGenerate` / `RoleCategorize`); the wired provider maps the role to a concrete model ID. The provider is chosen once, at the wiring site.
 - Prompts live in version-controlled files under `internal/llm/prompts/` (e.g. `generate_week.v1.txt`).
-- Use **prompt caching**: cache the stable part (household profile + disliked + pantry + recent feedback), vary only the generation trigger.
+- Use **prompt caching**: cache the stable part (household profile + disliked + pantry + recent feedback), vary only the generation trigger. Anthropic needs an explicit cache breakpoint on the System block; OpenAI caches long stable prefixes automatically.
 - **Validate LLM output against the hard constraints**: disliked ingredients must be 100% excluded — post-process and regenerate (max 1 retry) on violation.
 
 ---
 
 ## Security
 
-- **Secrets**: never hardcode tokens or keys. `ANTHROPIC_API_KEY` is a server-side env var only — never in code, never on the client.
+- **Secrets**: never hardcode tokens or keys. The LLM key (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) is a server-side env var only — never in code, never on the client.
+- **Pin the LLM base URL**: both SDKs silently honor a `*_BASE_URL` env var, which could redirect the key to an arbitrary host. Set the base URL explicitly at construction and do not read it from untrusted env.
 - **Input validation**: validate and sanitize all external input at the handler boundary. Trust nothing from outside, including LLM output (it's external too).
 - **Errors**: never expose internal error details, stack traces, or DB messages to the client. Log internally, return a generic message / friendly template.
 - **Privacy**: do not send personal data to the LLM beyond what the feature needs (preferences, feedback, generation history). Do not log prompt contents in production — log token count and latency only.
@@ -165,7 +189,7 @@ Go structs.
 
 ## Fault Tolerance
 
-### External calls (Anthropic API, DB)
+### External calls (LLM provider API, DB)
 - **Timeouts**: set an explicit timeout (`context.WithTimeout`) on every external call. Nothing blocks indefinitely.
 - **Retry with exponential backoff**: retry transient errors (network, 5xx) — 2s → 4s → 8s, max 3 attempts. Do NOT retry 4xx.
 - **Invalid LLM JSON**: retry once with a clarifying hint, then fail gracefully.
@@ -182,6 +206,13 @@ Go structs.
 ### Structured logging (`log/slog`, JSON to stdout)
 - Every entry includes timestamp, level, message, and a **`request_id`** (UUID) propagated
   across log lines and into LLM calls.
+- **Propagate `request_id` via `context.Context`, not via handler-package internals.**
+  The handler generates the UUID at the request boundary and stores it on the context
+  through a *neutral* shared package (e.g. `internal/reqid` with `WithID(ctx, id)` /
+  `FromContext(ctx)`). Services and the `internal/llm` client read it back from `ctx`.
+  Do NOT leave `Request.RequestID` empty to dodge a service→handler import — that
+  reverse dependency is the thing the neutral package exists to avoid; reading the
+  request_id from `ctx` keeps the dependency direction correct *and* satisfies this rule.
 - Log at boundaries: incoming request, outgoing LLM/DB call, error.
 - Do NOT log secrets, prompt contents, or personal data.
 
@@ -230,6 +261,14 @@ Nordic Kitchen essentials: warm cream background `#F5EFE6`, deep oak text `#2B21
 terracotta accent `#C2603A`; Fraunces headings + Public Sans body (self-hosted in
 `static/fonts/`); respect `prefers-color-scheme` for dark mode.
 
+### HTMX write idiom
+The established pattern for state-changing controls (shopping checkboxes, recipe feedback)
+is a native `<input type="checkbox" name=… value="true">` with `hx-trigger="change"` +
+`hx-target="closest …"` + `hx-swap="outerHTML"`. Endpoints take **absolute** state, never
+a toggle — this keeps a Service-Worker offline replay an idempotent no-op (see
+Fault Tolerance § Idempotency). The codebase uses **no `hx-vals`**; use `hx-include` to
+post the full control state. Match this idiom rather than introducing `<button>`+`hx-vals`.
+
 ### i18n
 All UI strings go through `t(key, args...)` registered in the template `FuncMap` — no
 hardcoded strings. Generated recipes keep the language they were created in; switching the
@@ -244,7 +283,11 @@ Run before every commit (style checks run alongside tests):
 ```bash
 gofmt -s -l .          # formatting (no output = clean)
 go vet ./...           # vet
-golangci-lint run ./...# lint  (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+golangci-lint run ./...# lint  (install: GOTOOLCHAIN=go1.26.3 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)
+                       #   NB: the repo pins go1.26.3 and ships a v2 .golangci.yml. A stock
+                       #   `@latest` install of the v1 module path is built with an older Go and
+                       #   refuses the v2 config ("Go language version ... is lower than 1.26.3").
+                       #   Use the v2 module path under the pinned toolchain, as shown.
 go test ./...          # tests
 govulncheck ./...      # dependency vulnerabilities (before adding/bumping deps)
 ```

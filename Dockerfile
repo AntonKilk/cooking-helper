@@ -1,5 +1,7 @@
 # ---- Build stage ----
-FROM golang:1.25-alpine AS build
+# go1.26.3 patches stdlib html/template / crypto / net advisories flagged by
+# govulncheck (GO-2026-4865/4866/4870/4918/4946/4947/4971/4980/4982).
+FROM golang:1.26.3-alpine AS build
 WORKDIR /src
 
 # Restore dependencies first for layer caching.

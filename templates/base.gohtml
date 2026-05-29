@@ -1,9 +1,13 @@
 {{- define "head" -}}
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#C2603A">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#C2603A" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#2B2118" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="{{ t "app.title" }}">
   <link rel="stylesheet" href="/static/css/app.css">
   <title>{{ t "app.title" }}</title>
 {{- end -}}
@@ -11,7 +15,11 @@
 {{- define "header" -}}
   <header class="app-header">
     <a href="/" hx-get="/" hx-target="#content" hx-push-url="true" class="app-header__title">{{ t "app.title" }}</a>
-    <a href="/settings" hx-get="/settings" hx-target="#content" hx-push-url="true" class="app-header__settings" aria-label="{{ t "nav.settings" }}">⚙</a>
+    <nav class="app-header__nav">
+      <a href="/shopping" hx-get="/shopping" hx-target="#content" hx-push-url="true" class="app-header__shopping">{{ t "nav.shopping" }}</a>
+      <a href="/archive" hx-get="/archive" hx-target="#content" hx-push-url="true" class="app-header__archive">{{ t "nav.archive" }}</a>
+      <a href="/settings" hx-get="/settings" hx-target="#content" hx-push-url="true" class="app-header__settings" aria-label="{{ t "nav.settings" }}">⚙</a>
+    </nav>
   </header>
 {{- end -}}
 

@@ -1,0 +1,249 @@
+Reference: authentic Finnish home recipes (source: ruokaboksi.fi, recepy-examples/).
+Use these ONLY as style/structure guidance — typical dish types, Finnish
+measurement units (tl, rkl, dl, rs, pkt, prk, g, kg, l), and the granularity/
+tone of cooking steps. Do NOT copy them. Always output in the household's
+language and in the required JSON schema; these examples are kept in Finnish
+on purpose, to show the source style — not the output format.
+
+### Tofua sweet chilikastikkeessa & riisiä
+[category: arkiruoka · ~25 min · yield: 4 meals]
+Tässä reseptissä tofu saa makua makean suolaisesta sweet chilikastikkeesta. Kastikkeeseen ruokaisuutta tuovat sipuli ja paprika. Lisäksi keitetään riisiä.
+Ingredients:
+- jasmiiniriisiä
+- sweet chilikastiketta
+- 0,5 dl soijakastiketta
+- valkoviinietikkaa
+- vettä
+- sokeria
+- sipuli
+- valkosipulinkynsi
+- punainen paprika
+- vihreä paprika
+- tofua
+- maissitärkkelystä
+- öljyä
+- suolaa
+- ripaus mustapippuria
+Steps:
+1. Laita vesi kiehumaan riisiä varten. Keitä riisi pakkauksen ohjeen mukaan.
+2. Valmista maustekastike. Sekoita pienessä astiassa sweet chilikastike, soijakastike, valkoviinietikka, vesi ja sokeri.
+3. Kuori ja suikaloi sipuli. Kuori ja hienonna valkosipulinkynnet. Huuhtele ja pilko paprikat.
+4. Leikkaa tofut pitkittäin puoliksi ja kuivaa talouspaperilla voimakkaasti painellen. Kuutioi tofut kulhoon. Kaada sekaan maissitärkkelys ja pyörittele tofut jauhoissa.
+5. Kuumenna paistinpannu ja öljy. Nostele tofut pannulle ja paista käännellen noin 6-8 minuuttia. Mausta suolalla ja mustapippurilla.
+6. Lisää sipulit ja paprikat pannulle. Jatka paistamista muutama minuutti.
+7. Kaada maustekastike pannulle. Kuumenna kiehuvaksi ja hauduta noin 3-5 minuuttia.
+8. Tarjoile tofu sweet chilikastikkeen ja riisin kanssa.
+
+### Kermainen pasta bratwurstilla & pinaatilla
+[category: arkiruoka · ~20 min · yield: 4 meals]
+Tässä reseptissä pasta valmistuu maukkaasta bratwurstista kermaisesta sinappikastikkeesta. Ruokaisuutta pastaan tuovat pinaatti ja tuore paprika.
+Ingredients:
+- sipuli
+- valkosipulinkynsi
+- punainen paprika
+- pinaattia
+- bratwurstia
+- öljyä
+- suolaa
+- mustapippuria
+- 1 tl kuivattua timjamia
+- (dijon)sinappia
+- ruokakermaa + 2 dl vettä
+- soijakastiketta
+- n. 400-500g pastaa
+Steps:
+1. Laita vesi kiehumaan pastaa varten. Keitä pasta pakkauksen ohjeen mukaan. Valuta keitetty pasta hyvin ja sekoita siihen öljy.
+2. Kuori ja suikaloi sipuli. Kuori ja hienonna valkosipulinkynnet. Huuhtele ja suikaloi paprika. Huuhtele pinaatit siivilässä kylmällä vedellä ja valuta hyvin.
+3. Pilko makkarat.
+4. Kuumenna paistinpannu ja öljy. Lisää sipulit, paprikat ja makkarat pannulle. Paista käännellen muutama minuutti. Mausta suolalla, mustapippurilla, kuivatulla timjamilla ja (dijon)sinapilla.
+5. Kaada ruokakerma pannulle, huuhtele purkki vedellä ja lisää myös vesi sekaan. Mausta soijakastikkeella. Sekoita kastikkeeseen pinaatit. Kuumenna kiehuvaksi ja hauduta noin 6-8 minuuttia.
+6. Tarjoa kermainen bratwurstpasta heti.
+
+### Mausteiset jauhelihatacot & Salsa de Verduraa
+[category: arkiruoka · ~20 min · yield: 4 meals]
+Tacot maistuvat aina! Tässä reseptissä kovat tacokuoret täytetään mausteisella jauhelihalla. Lisäksi valmistetaan itse tehtyä Salsa de Verduraa eli salsaa, joka on täynnä värikkäitä kasviksia. Tacot viimeistellään täyteläisellä creme fraichella.
+Ingredients:
+- kirsikkatomaatteja
+- punainen paprika
+- kurkku
+- punasipuli
+- limen kuori
+- limen mehu
+- suolaa
+- sokeria
+- öljyä
+- broilerin jauhelihaa
+- mustapippuria
+- 2 tl juustokuminaa
+- 2 tl paprikajauhetta
+- papusalsaa + tilkka vettä
+- tacokuoria
+- creme fraichea
+Steps:
+1. Huuhtele ja leikkaa kirsikkatomaatit neljään osaan kulhoon. Huuhtele ja kuutioi paprika sekä kurkku sekaan. Kuori ja hienonna punasipuli mahdollisimman pieniksi kuutioiksi kulhoon. Raasta sekaan pestyn puolikkaan limen kuori ja purista myös mehu joukkoon. Mausta suolalla ja sokerilla.
+2. Kuumenna paistinpannu ja öljy. Lisää jauheliha pannulle ja paista käännellen noin 4-5 minuuttia. Mausta suolalla, mustapippurilla, juustokuminalla ja paprikajauheella.
+3. Kaada papusalsa pannulle, huuhtele purkki vedellä ja lisää myös vesi sekaan. Kuumenna kiehuvaksi ja hauduta muutaman minuutin ajan.
+4. Täytä tacot jauhelihatäytteellä ja salsalla. Viimeistele creme fraichella ja tarjoa heti.
+
+### Jauhelihakeitto muksujen makuun & ruisleipää
+[category: jauheliha · ~35 min · yield: 4 meals]
+Jauhelihakeitto maistuu varmasti koko perheelle. Tomaattipyree ja mausteet tekevät tästä keitosta perinteistä versiota paremman. Keittojuurekset raastetaan, jolloin lapset syövät huomaamattaan kasviksia.
+Ingredients:
+- n. 15 dl vettä
+- lihafondi
+- suolaa
+- 1 kg perunoita
+- valkosipulinkynsi
+- keittojuureksia
+- öljyä
+- naudan jauhelihaa
+- mustapippuria
+- 1 tl paprikajauhetta
+- 2 tl kuivattua oreganoa
+- 2 rkl tomaattipyreetä
+- ruisleipää
+Steps:
+1. Mittaa reseptin vesi kattilaan kiehumaan. Mausta lihafondilla ja suolalla.
+2. Kuori ja kuutioi perunat kiehuvan veden sekaan. Keitä perunoita noin 10-15 minuuttia, tai kunnes perunat ovat melkein kypsiä.
+3. Kuori ja hienonna valkosipulinkynnet. Raasta tai pilko keittojuurekset.
+4. Kuumenna paistinpannu ja öljy. Lisää jauheliha pannulle ja paista käännellen noin 3-4 minuuttia.
+5. Lisää valkosipulit ja keittojuurekset pannulle. Jatka paistamista muutama minuutti. Mausta suolalla, mustapippurilla, paprikajauheella, kuivatulla oreganolla ja tomaattipyreellä.
+6. Kun perunat ovat melkein kypsiä, niin lisää paistettu jauheliha ja juurekset kattilaan perunoiden sekaan. Kuumenna kiehuvaksi ja hauduta muutama minuutti.
+7. Hienonna keittojuuresten mukana tullut persilja ja viimeistele keitto sillä.
+8. Tarjoile jauhelihakeitto
+
+### Parmesanjuustolla gratinoitu peltimakaronilaatikko
+[category: jauheliha · ~40 min · yield: 4 meals]
+Perinteisen makaronilaatikon sijaan tämä resepti valmistuu pellillä, jolloin se valmistuu nopeammin ja lopputulos on rapeampi verrattuna perinteiseen versioon. Parmesanjuusto tekee makaronilaatikosta astetta paremman.
+Ingredients:
+- makaronia
+- sipuli
+- valkosipulinkynsi
+- porkkana
+- öljyä
+- naudan jauhelihaa
+- suolaa
+- mustapippuria
+- 1 tl paprikajauhetta
+- 1 tl kuivattua timjamia
+- 2 kananmunaa
+- 5 dl maitoa
+- parmesanjuustoa
+- kurkku
+Steps:
+1. Laita vesi kiehumaan makaroneja varten. Kuumenna uuni 225 asteeseen ja vuoraa uunipelti leivinpaperilla.
+2. Keitä makaronit pakkauksen ohjeen mukaan, mutta vähennä keittoaikaa noin 3 minuuttia ohjeesta. Valuta melkein kypsät makaronit hyvin ja kumoa ne pellille.
+3. Kuori ja hienonna sipuli ja valkosipulinkynnet. Kuori, huuhtele ja raasta porkkanat.
+4. Kuumenna paistinpannu ja öljy. Lisää jauheliha pannulle ja paista käännellen noin 3-4 minuuttia.
+5. Lisää sipulit ja porkkanat pannulle. Mausta suolalla, mustapippurilla, paprikajauheella ja kuivatulla timjamilla. Jatka paistamista muutama minuutti.
+6. Kumoa paistettu jauheliha makaronien sekaan pellille.
+7. Riko kananmunat kulhoon ja vatkaa rakenne rikki. Mittaa sekaan maito ja suola.
+8. Kaada munamaito pellille ja ripottele pinnalle parmesanjuusto. Nosta uuniin ja paista noin 20-25 minuuttia, tai kunnes munamaito on hyytynyt.
+9. Huuhtele ja leikkaa kurkku tikuiksi.
+10. Anna makaronilaatikon levätä hetki ennen tarjoilua. Tarjoa kurkkutikkujen kanssa.
+
+### Misokastikkeella maustettua jauhelihaa & nuudeleita
+[category: jauheliha · ~25 min · yield: 4 meals]
+Miso on japanilainen täynnä umamia oleva maustetahna. Tässä reseptissä sillä maustetaan possun jauheliha ja parsakaali. Lisäksi tarjoillaan munanuudeleita ja annokset viimeistellään kevätsipulilla.
+Ingredients:
+- valkosipulinkynsi
+- 1 pala inkivääriä
+- kevätsipulia
+- parsakaali
+- öljyä
+- possun jauhelihaa
+- sokeria
+- soijakastiketta
+- valkoviinietikkaa
+- misotahnaa
+- maissitärkkelystä
+- vettä
+- nuudeleita
+Steps:
+1. Kuori ja raasta valkosipulinkynnet ja inkivääri. Huuhtele ja suikaloi kevätsipulit. Huuhtele ja leikkaa parsakaali pieniksi nupuiksi. Kuori ja pilko myös varsi.
+2. Laita vesi kiehumaan nuudeleita varten. Keitä nuudelit pakkauksen ohjeen mukaan. Valuta keitetyt nuudelit hyvin ja sekoita niihin öljy.
+3. Kuumenna paistinpannu ja öljy. Lisää jauheliha pannulle ja paista käännellen noin 3-4 minuuttia.
+4. Lisää valkosipulit, inkiväärit, puolet kevätsipuleista ja parsakaalit pannulle. Jatka paistamista hetken aikaa.
+5. Mausta jauheliha ja kasvikset sokerilla, soijakastikkeella, valkoviinietikalla ja misotahnalla.
+6. Sekoita pienessä astiassa maissitärkkelys ja vesi. Kaada seos pannulle koko ajan sekoittaen. Kuumenna kiehuvaksi ja hauduta muutama minuutti välillä sekoitellen.
+7. Tarjoile jauheliha ja parsakaalit nuudeleiden kanssa. Viimeistele annokset jäljellä olevilla kevätsipuleilla.
+
+### Pasta Bolognese & parmesanjuustoa
+[category: pasta · ~25 min · yield: 4 meals]
+Tällä kertaa perinteinen bolognese saa makua valmiiksi kuorituista keittojuureksista. Bolognesen kanssa tarjoillaan pastaa ja parmesanjuusto kruunaa kokonaisuuden.
+Ingredients:
+- valkosipulinkynsi
+- keittojuureksia
+- öljyä
+- sika-nautajauhelihaa
+- suolaa
+- mustapippuria
+- 1 tl kuivattua yrttisekoitusta
+- 2 tl kuivattua basilikaa
+- 2 tl paprikajauhetta
+- punaviinietikkaa
+- tomaattipyreetä
+- tomaattimurskaa + 2 dl vettä
+- parmesanjuustoa
+- n. 400-500g pastaa
+Steps:
+1. Laita vesi kiehumaan pastaa varten.
+2. Kuori ja hienonna valkosipulinkynnet. Kuutioi keittojuurekset pieniksi kuutioiksi. Voit myös raastaa juurekset.
+3. Keitä pasta pakkauksen ohjeen mukaan. Valuta keitetty pasta hyvin ja sekoita siihen öljy.
+4. Kuumenna paistinpannu ja öljy. Lisää jauheliha pannulle. Paista käännellen noin 3-4 minuuttia.
+5. Lisää valkosipulit ja keittojuurekset pannulle. Mausta suolalla, mustapippurilla, kuivatulla yrttisekoituksella, kuivatulla basilikalla, paprikajauheella, punaviinietikalla ja tomaattipyreellä. Jatka paistamista noin 4-5 minuuttia käännellen.
+6. Kaada tomaattimurska pannulle, huuhtele tölkki vedellä ja lisää myös vesi sekaan. Kuumenna kiehuvaksi ja hauduta noin 8-10 minuuttia.
+7. Hienonna keittojuuresten mukana tullut persilja.
+8. Tarjoa bolognese pastan kanssa. Viimeistele annokset parmesanjuustolla ja persiljalla.
+
+### Kanapasta aurinkokuivatuilla tomaateilla & pinaatilla
+[category: pasta · ~35 min · yield: 4 meals]
+Aurinkokuivatut tomaatit ja ruokaisa pinaatti ovat tämän pastan tähtiä. Kokonaisuus viimeistellään luomu parmesanjuustolla.
+Ingredients:
+- valkosipulinkynttä
+- punasipuli
+- pinaattia
+- aurinkokuivattuja tomaatteja + 2 rkl tomaattien öljyä
+- broilerin fileesuikaleita
+- suolaa
+- mustapippuria
+- kuivattua oreganoa
+- 2 tl sitruunan kuorta
+- sitruunan mehu
+- n. 400-500 g pastaa
+- öljyä
+- parmesanjuustoa
+Steps:
+1. Laita vesi kiehumaan pastaa varten.
+2. Kuori ja hienonna valkosipulinkynnet ja punasipuli. Huuhtele pinaatit siivilässä kylmällä vedellä ja jätä valumaan.
+3. Valuta aurinkokuivatut tomaatit, mutta säästä niiden öljyä noin 2 rkl. Suikaloi tomaatit.
+4. Keitä pasta pakkauksen ohjeen mukaan. Valuta keitetty pasta hyvin ja sekoita siihen öljy.
+5. Kuumenna paistinpannu ja aurinkokuivattujen tomaattien öljy. Lisää pannulle broilerin fileesuikaleet ja paista käännellen noin 4-5 minuuttia.
+6. Lisää pannulle sipulit ja aurinkokuivatut tomaatit. Mausta suolalla, mustapippurilla ja kuivatulla oreganolla. Jatka paistamista hetki.
+7. Sekoita pannulle huuhdellut pinaatit ja keitetty pasta. Raasta sekaan pestyn sitruunan kuorta ja purista mehua joukkoon.
+8. Annostele kanapastaa lautasille. Viimeistele annokset parmesanjuustolla.
+
+### Ruokaboksin kylmäsavulohipasta lehtikaalilla & kirsikkatomaateilla
+[category: pasta · ~20 min · yield: 4 meals]
+Tämä nopea ja helppo pastaresepti on yksi Ruokaboksin suosituimmista resepteistä. Kylmäsavulohen lisäksi pastaan tulee mehukkaita kirsikkatomaatteja ja ruokaisaa lehtikaalia. Raikas sitruuna viimeistelee pastan.
+Ingredients:
+- valkosipulinkynsi
+- lehtikaalia
+- kirsikkatomaatteja
+- kylmäsavulohta
+- öljyä
+- ripaus - 0,5 tl suolaa
+- mustapippuria
+- 1 tl kuivattua oreganoa
+- sitruunan kuori
+- sitruunan mehu
+- n. 400-500g pastaa
+Steps:
+1. Laita vesi kiehumaan pastaa varten.
+2. Kuori ja hienonna valkosipulinkynnet. Huuhtele lehtikaalit, poista kovat lehtiruodit ja suikaloi lehdet. Pese ja puolita kirsikkatomaatit.
+3. Suikaloi kylmäsavulohi.
+4. Keitä pasta pakkauksen ohjeen mukaan. Valuta keitetty pasta hyvin ja sekoita siihen öljy.
+5. Kuumenna paistinpannu ja öljy. Lisää valkosipulit ja kirsikkatomaatit pannulle. Paista käännellen muutama minuutti.
+6. Lisää lehtikaalit ja kylmäsavulohet pannulle. Jatka paistamista muutama minuutti. Mausta suolalla, mustapippurilla ja kuivatulla oreganolla.
+7. Sekoita keitetty pasta pannulle. Raasta sekaan pestyn puolikkaan sitruunan kuori ja purista myös mehua pastaan.
+8. Tarjoa kylmäsavulohipasta heti.

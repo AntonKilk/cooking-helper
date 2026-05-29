@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,56 @@ import (
 	dict "github.com/AntonKilk/cooking-helper/i18n"
 	"github.com/AntonKilk/cooking-helper/internal/domain"
 	"github.com/AntonKilk/cooking-helper/internal/i18n"
+	"github.com/AntonKilk/cooking-helper/internal/repository"
 	"github.com/AntonKilk/cooking-helper/templates"
 )
+
+// stubRecipeReader serves canned recipes for the recipe handler tests. Missing
+// ids return repository.ErrNotFound (mirroring real Store.GetRecipe).
+type stubRecipeReader struct {
+	byID map[string]*domain.Recipe
+	err  error
+}
+
+func (s stubRecipeReader) GetRecipe(_ context.Context, id string) (*domain.Recipe, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	r, ok := s.byID[id]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return r, nil
+}
+
+// testRecipes returns the fixture map used by the shared test router so the
+// handler can resolve the ids used in the recipe_test.go cases.
+func testRecipes() map[string]*domain.Recipe {
+	return map[string]*domain.Recipe{
+		"abc123": {
+			ID:              "abc123",
+			Title:           "Test Recipe",
+			Description:     "A short description.",
+			CookTimeMinutes: 25,
+			Servings:        4,
+			Ingredients: []domain.Ingredient{
+				{Name: "flour", Amount: 250, Unit: "g"},
+				{Name: "salt", Amount: 0, Unit: "pinch"},
+			},
+			Steps: []string{"Mix the flour and salt.", "Bake for 20 minutes."},
+		},
+		// A recipe that already carries feedback, so the detail view can be
+		// asserted to render the active state (CH-16).
+		"liked1": {
+			ID:              "liked1",
+			Title:           "Liked Recipe",
+			CookTimeMinutes: 10,
+			Servings:        2,
+			Steps:           []string{"Eat."},
+			Feedback:        &domain.Feedback{Liked: true},
+		},
+	}
+}
 
 func testBundle(t *testing.T) *i18n.Bundle {
 	t.Helper()
@@ -35,9 +84,12 @@ func testTemplates(t *testing.T) *template.Template {
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 	rd := &renderer{tmpl: testTemplates(t), bundle: testBundle(t)}
+	hh := &homeHandlers{rd: rd}
+	rh := &recipeHandlers{rd: rd, recipes: stubRecipeReader{byID: testRecipes()}, feedback: stubFeedbackSetter{byID: testRecipes()}}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", rd.Home)
-	mux.HandleFunc("GET /recipe/{id}", rd.Recipe)
+	mux.HandleFunc("GET /{$}", hh.Home)
+	mux.HandleFunc("GET /recipe/{id}", rh.Show)
+	mux.HandleFunc("POST /recipe/{id}/feedback", rh.Feedback)
 	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(rd.bundle))
 	return languageMiddleware(rd.bundle, mux)
@@ -47,13 +99,13 @@ func TestHomeRendersByAcceptLanguage(t *testing.T) {
 	srv := newTestRouter(t)
 	cases := []struct {
 		header string
-		want   string // a localized category string expected in the body
+		want   string // a localized string expected in the body
 		lang   string
 	}{
-		{"fi-FI,fi;q=0.9", "Pakasteet", "fi"},
-		{"ru-RU,ru;q=0.9", "Овощи и фрукты", "ru"},
-		{"en-US,en;q=0.9", "Produce", "en"},
-		{"de-DE", "Produce", "en"}, // unsupported → default EN
+		{"fi-FI,fi;q=0.9", "Ostoslista", "fi"},
+		{"ru-RU,ru;q=0.9", "Список покупок", "ru"},
+		{"en-US,en;q=0.9", "Shopping list", "en"},
+		{"de-DE", "Shopping list", "en"}, // unsupported → default EN
 	}
 	for _, c := range cases {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -90,7 +142,7 @@ func TestHomeHTMXReturnsFragment(t *testing.T) {
 	if strings.Contains(strings.ToLower(body), "<!doctype") {
 		t.Errorf("HTMX request returned a full page, want content fragment only:\n%s", body)
 	}
-	if !strings.Contains(body, "Produce") {
+	if !strings.Contains(body, "Shopping list") {
 		t.Errorf("fragment missing home content:\n%s", body)
 	}
 }
@@ -126,7 +178,7 @@ func TestHomeCookieWinsOverHeader(t *testing.T) {
 
 	srv.ServeHTTP(rec, req)
 
-	if !strings.Contains(rec.Body.String(), "Pakasteet") {
+	if !strings.Contains(rec.Body.String(), "Ostoslista") {
 		t.Error("cookie language (fi) did not win over Accept-Language header")
 	}
 }

@@ -1,0 +1,79 @@
+{{- define "shopping/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "shopping/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  <script src="/static/js/shopping-filter.js" defer></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "shopping/content" -}}
+  <h1>{{ t "shopping.heading" }}</h1>
+  {{- if .Empty }}
+  <p class="shopping__empty">{{ t "shopping.empty" }}</p>
+  <p class="shopping__empty-hint">
+    <a href="/" hx-get="/" hx-target="#content" hx-push-url="true">{{ t "shopping.empty_hint" }}</a>
+  </p>
+  {{- else }}
+  <div class="shopping__toolbar">
+    <label class="shopping__filter">
+      <input type="checkbox" class="shopping__filter-toggle" data-shopping-filter>
+      {{ t "shopping.show_purchased" }}
+    </label>
+  </div>
+  <div class="shopping-list" data-shopping-list>
+    {{- range .Groups }}
+    <section class="shopping-group" aria-labelledby="cat-{{ .HeadingKey }}">
+      <h2 id="cat-{{ .HeadingKey }}" class="shopping-group__heading">{{ t .HeadingKey }}</h2>
+      <ul class="shopping-group__items">
+        {{- range .Items }}
+        {{ template "shopping/item" . }}
+        {{- end }}
+      </ul>
+    </section>
+    {{- end }}
+  </div>
+  {{- end }}
+{{- end -}}
+
+{{- define "shopping/item" -}}
+  <li class="shopping-item{{ if .Checked }} shopping-item--checked{{ end }}">
+    <label class="shopping-item__check">
+      <input type="checkbox" name="checked" value="true"
+             {{ if .Checked }}checked{{ end }}
+             hx-post="/shopping/item/{{ .ID }}/check"
+             hx-trigger="change"
+             hx-target="closest .shopping-item"
+             hx-swap="outerHTML">
+      <span class="shopping-item__text">
+        {{- if .Amount }}<span class="shopping-item__amount">{{ .Amount }}</span>{{ end }}
+        {{- if .Unit }} <span class="shopping-item__unit">{{ .Unit }}</span>{{ end }}
+        <span class="shopping-item__name">{{ .Name }}</span>
+      </span>
+    </label>
+    <button type="button" class="shopping-item__remove"
+            hx-post="/shopping/item/{{ .ID }}/remove"
+            hx-target="closest .shopping-item"
+            hx-swap="outerHTML"
+            aria-label="{{ t "shopping.remove" }}">{{ t "shopping.remove" }}</button>
+  </li>
+{{- end -}}
+
+{{- define "shopping/removed" -}}
+  <li class="shopping-item shopping-item--removed">
+    <span class="shopping-item__removed-label">{{ t "shopping.removed" }}</span>
+    <button type="button" class="shopping-item__undo"
+            hx-post="/shopping/item/{{ .ID }}/restore"
+            hx-target="closest .shopping-item"
+            hx-swap="outerHTML">{{ t "shopping.undo" }}</button>
+  </li>
+{{- end -}}
