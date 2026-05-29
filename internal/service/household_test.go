@@ -124,6 +124,86 @@ func TestUpdateProfilePersists(t *testing.T) {
 	}
 }
 
+func TestAddDisliked(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewHouseholdService(repo)
+	ctx := context.Background()
+
+	h, err := svc.Current(ctx, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+
+	t.Run("new term is appended and persisted", func(t *testing.T) {
+		got, err := svc.AddDisliked(ctx, h.ID, "  Mushrooms  ")
+		if err != nil {
+			t.Fatalf("add: %v", err)
+		}
+		if len(got.DislikedIngredients) != 1 || got.DislikedIngredients[0] != "Mushrooms" {
+			t.Fatalf("disliked = %v, want [Mushrooms] (trimmed)", got.DislikedIngredients)
+		}
+		if len(repo.rows[h.ID].DislikedIngredients) != 1 {
+			t.Fatal("add was not persisted to the repository")
+		}
+	})
+
+	t.Run("case-insensitive duplicate is a no-op", func(t *testing.T) {
+		got, err := svc.AddDisliked(ctx, h.ID, "mushrooms")
+		if err != nil {
+			t.Fatalf("add dup: %v", err)
+		}
+		if len(got.DislikedIngredients) != 1 {
+			t.Fatalf("disliked = %v, want length 1 after duplicate", got.DislikedIngredients)
+		}
+	})
+
+	t.Run("blank term is rejected", func(t *testing.T) {
+		if _, err := svc.AddDisliked(ctx, h.ID, "   "); !errors.Is(err, ErrEmptyIngredient) {
+			t.Fatalf("err = %v, want ErrEmptyIngredient", err)
+		}
+		if len(repo.rows[h.ID].DislikedIngredients) != 1 {
+			t.Fatalf("list mutated to %v on blank input", repo.rows[h.ID].DislikedIngredients)
+		}
+	})
+}
+
+func TestRemoveDisliked(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewHouseholdService(repo)
+	ctx := context.Background()
+
+	h, err := svc.Current(ctx, domain.LanguageEN)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	if _, err := svc.AddDisliked(ctx, h.ID, "Mushrooms"); err != nil {
+		t.Fatalf("seed add: %v", err)
+	}
+
+	t.Run("absent term is a no-op", func(t *testing.T) {
+		got, err := svc.RemoveDisliked(ctx, h.ID, "olives")
+		if err != nil {
+			t.Fatalf("remove absent: %v", err)
+		}
+		if len(got.DislikedIngredients) != 1 {
+			t.Fatalf("disliked = %v, want length 1 unchanged", got.DislikedIngredients)
+		}
+	})
+
+	t.Run("case-insensitive match removes and leaves empty list", func(t *testing.T) {
+		got, err := svc.RemoveDisliked(ctx, h.ID, "MUSHROOMS")
+		if err != nil {
+			t.Fatalf("remove: %v", err)
+		}
+		if len(got.DislikedIngredients) != 0 {
+			t.Fatalf("disliked = %v, want empty after removal", got.DislikedIngredients)
+		}
+		if len(repo.rows[h.ID].DislikedIngredients) != 0 {
+			t.Fatal("removal was not persisted to the repository")
+		}
+	})
+}
+
 func TestUpdateProfileRejectsOutOfRange(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewHouseholdService(repo)
