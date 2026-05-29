@@ -107,6 +107,10 @@ cooking-helper/
 
 Dependency direction: **handlers → services → repositories → domain. Never reverse.**
 
+**Wiring site**: dependencies (services, repositories, LLM client) are constructed and
+wired together in `internal/handler/router.go`, **not** in `cmd/server/main.go`. Add new
+routes and dependency wiring there.
+
 ### Domain-Driven Design
 - Group code by domain feature (`internal/shopping/`), not by technical layer.
 - Name types, functions, and packages after the domain concept, not the technology.
@@ -257,6 +261,14 @@ Nordic Kitchen essentials: warm cream background `#F5EFE6`, deep oak text `#2B21
 terracotta accent `#C2603A`; Fraunces headings + Public Sans body (self-hosted in
 `static/fonts/`); respect `prefers-color-scheme` for dark mode.
 
+### HTMX write idiom
+The established pattern for state-changing controls (shopping checkboxes, recipe feedback)
+is a native `<input type="checkbox" name=… value="true">` with `hx-trigger="change"` +
+`hx-target="closest …"` + `hx-swap="outerHTML"`. Endpoints take **absolute** state, never
+a toggle — this keeps a Service-Worker offline replay an idempotent no-op (see
+Fault Tolerance § Idempotency). The codebase uses **no `hx-vals`**; use `hx-include` to
+post the full control state. Match this idiom rather than introducing `<button>`+`hx-vals`.
+
 ### i18n
 All UI strings go through `t(key, args...)` registered in the template `FuncMap` — no
 hardcoded strings. Generated recipes keep the language they were created in; switching the
@@ -271,7 +283,11 @@ Run before every commit (style checks run alongside tests):
 ```bash
 gofmt -s -l .          # formatting (no output = clean)
 go vet ./...           # vet
-golangci-lint run ./...# lint  (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+golangci-lint run ./...# lint  (install: GOTOOLCHAIN=go1.26.3 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)
+                       #   NB: the repo pins go1.26.3 and ships a v2 .golangci.yml. A stock
+                       #   `@latest` install of the v1 module path is built with an older Go and
+                       #   refuses the v2 config ("Go language version ... is lower than 1.26.3").
+                       #   Use the v2 module path under the pinned toolchain, as shown.
 go test ./...          # tests
 govulncheck ./...      # dependency vulnerabilities (before adding/bumping deps)
 ```
