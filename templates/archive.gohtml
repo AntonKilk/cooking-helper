@@ -1,0 +1,105 @@
+{{- define "archive/page" -}}
+<!doctype html>
+<html lang="{{ .Lang }}">
+<head>
+{{ template "head" . }}
+</head>
+<body>
+  {{ template "header" . }}
+  <main id="content">
+    {{ template "archive/content" . }}
+  </main>
+  <script src="/static/js/htmx.min.js"></script>
+  {{ template "sw-register" . }}
+</body>
+</html>
+{{- end -}}
+
+{{- define "archive/content" -}}
+  <h1>{{ t "archive.heading" }}</h1>
+
+  <input type="search" name="q" class="archive-search" value="{{ .Query }}"
+         placeholder="{{ t "archive.search_placeholder" }}"
+         aria-label="{{ t "archive.search_placeholder" }}"
+         autocomplete="off"
+         hx-get="/archive/search"
+         hx-trigger="keyup changed delay:200ms, search"
+         hx-target="#archive-list"
+         hx-swap="outerHTML">
+
+  {{ template "archive/list" . }}
+{{- end -}}
+
+{{- define "archive/list" -}}
+  <ul id="archive-list" class="archive-list">
+    {{- if .LoadError }}
+    <li class="archive-list__error" role="alert">{{ t "archive.load_error" }}</li>
+    {{- else if not .Recipes }}
+    <li class="archive-list__empty">{{ t "archive.empty" }}</li>
+    {{- else }}
+    {{- range .Recipes }}
+    <li class="archive-item">
+      <a class="archive-item__link" href="/recipe/{{ .ID }}"
+         hx-get="/recipe/{{ .ID }}" hx-target="#content" hx-push-url="true">
+        <h2 class="archive-item__title">{{ .Title }}</h2>
+        <p class="archive-item__time">{{ t "recipe.cook_time" .CookTime }}</p>
+        {{- if .Description }}
+        <p class="archive-item__desc">{{ .Description }}</p>
+        {{- end }}
+      </a>
+      <p class="archive-item__feedback">
+        {{- if .Liked }}<span class="archive-item__icon" role="img" aria-label="{{ t "recipe.feedback_like" }}">👍</span>{{ end }}
+        {{- if .Disliked }}<span class="archive-item__icon" role="img" aria-label="{{ t "recipe.feedback_dislike" }}">👎</span>{{ end }}
+        {{- if .CookAgain }}<span class="archive-item__icon" role="img" aria-label="{{ t "recipe.feedback_cook_again" }}">🔁</span>{{ end }}
+      </p>
+      {{- if $.CanCook }}
+      <button type="button" class="archive-item__cook-again"
+              hx-get="/archive/cook-again/{{ .ID }}"
+              hx-target="#archive-dialog-{{ .ID }}"
+              hx-swap="innerHTML">
+        {{ t "archive.cook_again" }}
+      </button>
+      <div id="archive-dialog-{{ .ID }}" class="archive-item__dialog"></div>
+      {{- end }}
+    </li>
+    {{- end }}
+    {{- end }}
+  </ul>
+{{- end -}}
+
+{{- /*
+  archive/dialog asks which of the active week's recipes to replace with the
+  chosen archived recipe. Each choice posts the absolute target via a hidden
+  "old" field (matching the codebase's hidden-input form idiom — no hx-vals).
+*/ -}}
+{{- define "archive/dialog" -}}
+  {{- if .NoPlan }}
+  <p class="archive-dialog__empty" role="status">{{ t "archive.no_active_week" }}</p>
+  {{- else }}
+  <div class="archive-dialog" role="group" aria-label="{{ t "archive.dialog_heading" }}">
+    <p class="archive-dialog__heading">{{ t "archive.dialog_heading" }}</p>
+    <ul class="archive-dialog__choices">
+      {{- range .Current }}
+      <li>
+        <form hx-post="/archive/cook-again/{{ $.SourceID }}"
+              hx-target="closest .archive-item__dialog" hx-swap="innerHTML">
+          <input type="hidden" name="old" value="{{ .ID }}">
+          <button type="submit" class="archive-dialog__choice">{{ .Title }}</button>
+        </form>
+      </li>
+      {{- end }}
+    </ul>
+  </div>
+  {{- end }}
+{{- end -}}
+
+{{- define "archive/done" -}}
+  <p class="archive-done" role="status">
+    <span class="archive-done__msg">{{ t "archive.done" }} {{ .AddedTitle }}</span>
+    <a class="archive-done__link" href="/" hx-get="/" hx-target="#content" hx-push-url="true">{{ t "archive.view_week" }}</a>
+  </p>
+{{- end -}}
+
+{{- define "archive/error" -}}
+  <p class="archive-error" role="alert">{{ t "archive.error" }}</p>
+{{- end -}}

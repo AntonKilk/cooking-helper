@@ -211,6 +211,98 @@ func TestRecipesByIDsEmpty(t *testing.T) {
 	}
 }
 
+func TestSearchRecipesSubstringAndOrder(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	// Inserted oldest-to-newest; SearchRecipes orders newest-first.
+	for _, title := range []string{"Creamy Pasta", "Chicken Curry", "Pasta Bolognese"} {
+		r := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: title, Source: domain.SourceLLM}
+		if err := store.CreateRecipe(ctx, r); err != nil {
+			t.Fatalf("create %s: %v", title, err)
+		}
+	}
+
+	// Empty query returns all, newest-first.
+	all, err := store.SearchRecipes(ctx, h.ID, "", 50)
+	if err != nil {
+		t.Fatalf("search (empty): %v", err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("search empty len = %d, want 3", len(all))
+	}
+	if all[0].Title != "Pasta Bolognese" || all[2].Title != "Creamy Pasta" {
+		t.Fatalf("order = [%s,%s,%s], want newest-first", all[0].Title, all[1].Title, all[2].Title)
+	}
+
+	// Case-insensitive substring match, still newest-first.
+	pasta, err := store.SearchRecipes(ctx, h.ID, "pAsTa", 50)
+	if err != nil {
+		t.Fatalf("search (pasta): %v", err)
+	}
+	if len(pasta) != 2 {
+		t.Fatalf("search 'pasta' len = %d, want 2", len(pasta))
+	}
+	if pasta[0].Title != "Pasta Bolognese" || pasta[1].Title != "Creamy Pasta" {
+		t.Fatalf("search 'pasta' = [%s,%s], want [Pasta Bolognese, Creamy Pasta]", pasta[0].Title, pasta[1].Title)
+	}
+
+	// Limit caps the result count.
+	limited, err := store.SearchRecipes(ctx, h.ID, "", 1)
+	if err != nil {
+		t.Fatalf("search (limit 1): %v", err)
+	}
+	if len(limited) != 1 || limited[0].Title != "Pasta Bolognese" {
+		t.Fatalf("limited = %v, want [Pasta Bolognese]", limited)
+	}
+}
+
+func TestSearchRecipesEscapesLikeWildcards(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	for _, title := range []string{"100% Beef Burger", "Chicken Curry"} {
+		r := &domain.Recipe{HouseholdID: h.ID, Language: domain.LanguageEN, Title: title, Source: domain.SourceLLM}
+		if err := store.CreateRecipe(ctx, r); err != nil {
+			t.Fatalf("create %s: %v", title, err)
+		}
+	}
+
+	// A bare "%" must be matched literally, not as the match-all wildcard:
+	// only the title that actually contains "%" should come back.
+	got, err := store.SearchRecipes(ctx, h.ID, "%", 50)
+	if err != nil {
+		t.Fatalf("search (%%): %v", err)
+	}
+	if len(got) != 1 || got[0].Title != "100% Beef Burger" {
+		t.Fatalf("search '%%' = %v, want only [100%% Beef Burger]", got)
+	}
+}
+
+func TestSearchRecipesScopedToHousehold(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	h := newTestHousehold(t, store)
+
+	other := &domain.HouseholdProfile{Language: domain.LanguageEN, FamilySize: domain.FamilySize{Adults: 1}}
+	if err := store.CreateHousehold(ctx, other); err != nil {
+		t.Fatalf("create other household: %v", err)
+	}
+	if err := store.CreateRecipe(ctx, &domain.Recipe{HouseholdID: other.ID, Language: domain.LanguageEN, Title: "Shared Pasta", Source: domain.SourceLLM}); err != nil {
+		t.Fatalf("create other recipe: %v", err)
+	}
+
+	got, err := store.SearchRecipes(ctx, h.ID, "pasta", 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("search len = %d, want 0 (another household's recipe leaked)", len(got))
+	}
+}
+
 func TestRecipeCascadeOnHouseholdDelete(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
