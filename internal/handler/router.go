@@ -36,6 +36,7 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	hh := &homeHandlers{rd: rd, canGenerate: canGenerate}
 	rh := &recipeHandlers{rd: rd, recipes: store}
 	sh := &shoppingHandlers{rd: rd, store: store, households: svc}
+	dh := &dislikedHandlers{rd: rd, profiles: svc, history: store}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", Health(db))
@@ -49,6 +50,9 @@ func NewRouter(logger *slog.Logger, db *sql.DB, bundle *i18n.Bundle, tmpl *templ
 	mux.HandleFunc("POST /settings/language", SetLanguage(bundle))
 	mux.HandleFunc("GET /settings/profile", ph.Show)
 	mux.HandleFunc("POST /settings/profile", ph.Save)
+	mux.HandleFunc("GET /settings/disliked", dh.Show)
+	mux.HandleFunc("POST /settings/disliked", dh.Add)
+	mux.HandleFunc("POST /settings/disliked/remove", dh.Remove)
 	mux.Handle("GET /static/", StaticFiles(staticFS))
 	mux.HandleFunc("GET /sw.js", ServiceWorker(staticFS))
 	mux.HandleFunc("GET /manifest.webmanifest", Manifest(staticFS))

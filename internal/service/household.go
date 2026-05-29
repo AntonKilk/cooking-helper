@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/AntonKilk/cooking-helper/internal/domain"
 	"github.com/AntonKilk/cooking-helper/internal/repository"
@@ -12,6 +13,10 @@ import (
 // ErrInvalidFamilySize is returned when the requested family composition falls
 // outside the supported range (adults 1-6, kids 0-6).
 var ErrInvalidFamilySize = errors.New("service: family size out of range")
+
+// ErrEmptyIngredient is returned when an empty or whitespace-only ingredient is
+// submitted to AddDisliked.
+var ErrEmptyIngredient = errors.New("service: ingredient is empty")
 
 // Family size bounds enforced on every profile update. Defaults seed a brand-new
 // household on first access.
@@ -82,6 +87,60 @@ func (s *HouseholdService) UpdateProfile(ctx context.Context, id string, lang do
 	h.FamilySize = domain.FamilySize{Adults: adults, Kids: kids}
 	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
 		return nil, fmt.Errorf("update profile: %w", err)
+	}
+	return h, nil
+}
+
+// AddDisliked appends a disliked ingredient to the household, trimming the term
+// and deduplicating case-insensitively. A blank term yields ErrEmptyIngredient.
+// Adding an already-present term is a no-op success (idempotent): the current
+// profile is returned without a write.
+func (s *HouseholdService) AddDisliked(ctx context.Context, id, term string) (*domain.HouseholdProfile, error) {
+	term = strings.TrimSpace(term)
+	if term == "" {
+		return nil, ErrEmptyIngredient
+	}
+
+	h, err := s.repo.GetHousehold(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("add disliked: %w", err)
+	}
+
+	for _, existing := range h.DislikedIngredients {
+		if strings.EqualFold(strings.TrimSpace(existing), term) {
+			return h, nil
+		}
+	}
+
+	h.DislikedIngredients = append(h.DislikedIngredients, term)
+	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
+		return nil, fmt.Errorf("add disliked: %w", err)
+	}
+	return h, nil
+}
+
+// RemoveDisliked drops every disliked ingredient matching term case-insensitively
+// and persists the result. Removing an absent term is a no-op success. An empty
+// list is valid.
+func (s *HouseholdService) RemoveDisliked(ctx context.Context, id, term string) (*domain.HouseholdProfile, error) {
+	term = strings.TrimSpace(term)
+
+	h, err := s.repo.GetHousehold(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("remove disliked: %w", err)
+	}
+
+	kept := make([]string, 0, len(h.DislikedIngredients))
+	for _, existing := range h.DislikedIngredients {
+		if strings.EqualFold(strings.TrimSpace(existing), term) {
+			continue
+		}
+		kept = append(kept, existing)
+	}
+	h.DislikedIngredients = kept
+
+	if err := s.repo.UpdateHousehold(ctx, h); err != nil {
+		return nil, fmt.Errorf("remove disliked: %w", err)
 	}
 	return h, nil
 }

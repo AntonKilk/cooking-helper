@@ -24,6 +24,11 @@
   </section>
 
   <section>
+    <h2>{{ t "settings.disliked" }}</h2>
+    <p><a href="/settings/disliked" hx-get="/settings/disliked" hx-target="#content" hx-push-url="true">{{ t "settings.disliked" }}</a></p>
+  </section>
+
+  <section>
     <h2>{{ t "settings.language" }}</h2>
     <form class="lang-switcher" method="post" action="/settings/language">
       <button type="submit" name="lang" value="ru">{{ t "lang.ru" }}</button>
