@@ -34,13 +34,16 @@ type generateHandlers struct {
 	recipes    recipeLoader
 }
 
-// recipeCard is the per-recipe view model for the home cards.
+// recipeCard is the per-recipe view model for the home cards. Feedback carries
+// the recipe's like/dislike/cook-again state so the card can render the
+// integrated feedback control (F-5 / CH-16).
 type recipeCard struct {
 	ID          string
 	Title       string
 	Description string
 	CookTime    int
 	Emoji       string
+	Feedback    feedbackView
 }
 
 // cardsData is the view model for the generated-week fragment.
@@ -90,12 +93,14 @@ func (gh *generateHandlers) Generate(w http.ResponseWriter, r *http.Request) {
 
 	cards := make([]recipeCard, len(week.Recipes))
 	for i, rec := range week.Recipes {
+		rec := rec
 		cards[i] = recipeCard{
 			ID:          rec.ID,
 			Title:       rec.Title,
 			Description: rec.Description,
 			CookTime:    rec.CookTimeMinutes,
 			Emoji:       emojiFor(week.Proteins[i]),
+			Feedback:    toFeedbackView(&rec),
 		}
 	}
 	gh.rd.renderFragment(w, r, http.StatusOK, "generate/cards", cardsData{Cards: cards})
@@ -163,6 +168,7 @@ func (gh *generateHandlers) Swap(w http.ResponseWriter, r *http.Request) {
 				Description: swapped.Recipe.Description,
 				CookTime:    swapped.Recipe.CookTimeMinutes,
 				Emoji:       emojiFor(swapped.Protein),
+				Feedback:    toFeedbackView(&swapped.Recipe),
 			}
 			continue
 		}
@@ -173,6 +179,7 @@ func (gh *generateHandlers) Swap(w http.ResponseWriter, r *http.Request) {
 			Description: rec.Description,
 			CookTime:    rec.CookTimeMinutes,
 			Emoji:       emojiFor(inferProteinFromRecipe(rec)),
+			Feedback:    toFeedbackView(&rec),
 		}
 	}
 	gh.rd.renderFragment(w, r, http.StatusOK, "generate/cards", cardsData{Cards: cards})

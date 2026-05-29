@@ -50,6 +50,16 @@ func testRecipes() map[string]*domain.Recipe {
 			},
 			Steps: []string{"Mix the flour and salt.", "Bake for 20 minutes."},
 		},
+		// A recipe that already carries feedback, so the detail view can be
+		// asserted to render the active state (CH-16).
+		"liked1": {
+			ID:              "liked1",
+			Title:           "Liked Recipe",
+			CookTimeMinutes: 10,
+			Servings:        2,
+			Steps:           []string{"Eat."},
+			Feedback:        &domain.Feedback{Liked: true},
+		},
 	}
 }
 
@@ -75,10 +85,11 @@ func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 	rd := &renderer{tmpl: testTemplates(t), bundle: testBundle(t)}
 	hh := &homeHandlers{rd: rd}
-	rh := &recipeHandlers{rd: rd, recipes: stubRecipeReader{byID: testRecipes()}}
+	rh := &recipeHandlers{rd: rd, recipes: stubRecipeReader{byID: testRecipes()}, feedback: stubFeedbackSetter{byID: testRecipes()}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", hh.Home)
 	mux.HandleFunc("GET /recipe/{id}", rh.Show)
+	mux.HandleFunc("POST /recipe/{id}/feedback", rh.Feedback)
 	mux.HandleFunc("GET /settings", rd.Settings)
 	mux.HandleFunc("POST /settings/language", SetLanguage(rd.bundle))
 	return languageMiddleware(rd.bundle, mux)

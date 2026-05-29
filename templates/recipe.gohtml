@@ -29,6 +29,11 @@
     <p class="recipe__desc">{{ .Recipe.Description }}</p>
     {{- end }}
 
+    <section class="recipe__feedback" aria-labelledby="recipe-feedback-heading">
+      <h2 id="recipe-feedback-heading" class="recipe__feedback-heading">{{ t "recipe.feedback_heading" }}</h2>
+      {{ template "recipe/feedback" .Recipe.Feedback }}
+    </section>
+
     <div class="recipe__grid">
       <section class="recipe__ingredients" aria-labelledby="recipe-ingredients-heading">
         <h2 id="recipe-ingredients-heading">{{ t "recipe.ingredients_heading" }}</h2>
@@ -60,4 +65,47 @@
     </div>
   </article>
   {{- end }}
+{{- end -}}
+
+{{- /*
+  recipe/feedback renders the integrated like / dislike / cook-again control
+  (F-5 / CH-16). It takes a feedbackView. Each checkbox posts the ABSOLUTE state
+  of all three flags (via hx-include) so the write is idempotent and a
+  Service-Worker replay is a safe no-op. The whole control is swapped out on
+  every change, reflecting the persisted state. Shared by the recipe detail view
+  and the week cards.
+*/ -}}
+{{- define "recipe/feedback" -}}
+  <form class="feedback" data-recipe-id="{{ .RecipeID }}">
+    <label class="feedback__btn{{ if .Liked }} feedback__btn--active{{ end }}">
+      <input type="checkbox" name="liked" value="true" {{ if .Liked }}checked{{ end }}
+             hx-post="/recipe/{{ .RecipeID }}/feedback"
+             hx-trigger="change"
+             hx-include="closest .feedback"
+             hx-target="closest .feedback"
+             hx-swap="outerHTML">
+      <span class="feedback__icon" aria-hidden="true">👍</span>
+      <span class="feedback__label">{{ t "recipe.feedback_like" }}</span>
+    </label>
+    <label class="feedback__btn{{ if .Disliked }} feedback__btn--active{{ end }}">
+      <input type="checkbox" name="disliked" value="true" {{ if .Disliked }}checked{{ end }}
+             hx-post="/recipe/{{ .RecipeID }}/feedback"
+             hx-trigger="change"
+             hx-include="closest .feedback"
+             hx-target="closest .feedback"
+             hx-swap="outerHTML">
+      <span class="feedback__icon" aria-hidden="true">👎</span>
+      <span class="feedback__label">{{ t "recipe.feedback_dislike" }}</span>
+    </label>
+    <label class="feedback__btn{{ if .CookAgain }} feedback__btn--active{{ end }}">
+      <input type="checkbox" name="cook_again" value="true" {{ if .CookAgain }}checked{{ end }}
+             hx-post="/recipe/{{ .RecipeID }}/feedback"
+             hx-trigger="change"
+             hx-include="closest .feedback"
+             hx-target="closest .feedback"
+             hx-swap="outerHTML">
+      <span class="feedback__icon" aria-hidden="true">🔁</span>
+      <span class="feedback__label">{{ t "recipe.feedback_cook_again" }}</span>
+    </label>
+  </form>
 {{- end -}}

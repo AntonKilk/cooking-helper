@@ -317,3 +317,60 @@ html { -webkit-tap-highlight-color: transparent; }
 .shopping-list:not(.shopping-list--show-purchased) .shopping-item--checked {
   display: none;
 }
+
+/* Recipe feedback (CH-16 / F-5): integrated like / dislike / cook-again toggles,
+   shared by the recipe detail view and the week cards. */
+.recipe__feedback { margin: var(--space) 0; }
+
+.recipe__feedback-heading {
+  font-size: 1.25rem;
+  margin: 0 0 0.5em;
+  color: var(--text-muted);
+}
+
+.feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+/* The native checkbox drives the accessible state; the label is the touch
+   target, styled as a button. */
+.feedback__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  padding: 0 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Hide the native box but keep it focusable for keyboard + screen readers. */
+.feedback__btn input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.feedback__icon { font-size: 1.5rem; line-height: 1; }
+
+.feedback__btn--active {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+}
+
+/* Keyboard focus ring on the label when its checkbox is focused. */
+.feedback__btn:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
