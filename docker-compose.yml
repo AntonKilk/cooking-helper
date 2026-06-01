@@ -10,6 +10,7 @@ services:
       DB_PATH: "/data/cooking.db"
       # Passed through from the host environment; never hardcode the key here.
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
     volumes:
       - cooking-data:/data
     healthcheck:
