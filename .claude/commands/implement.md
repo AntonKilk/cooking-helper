@@ -214,6 +214,42 @@ mkdir -p .agents/reports
 | Test File | Test Cases |
 |-----------|------------|
 | `src/x.test.ts` | {list} |
+
+## How to Run & Verify
+
+> Final hand-off to the owner for manual verification. Copy-paste runnable commands
+> and a concrete checklist derived from the plan's **Acceptance Criteria** (scenarios
+> + negative criteria). The owner runs this — the agent does not self-certify here.
+
+### Run locally
+
+```bash
+# Exact commands, in order. Use values from CLAUDE.md / docker-compose.yml.
+{e.g. go run ./cmd/server}
+{e.g. open https://<tailnet>/plan in iPad Safari}
+```
+
+### What to check (from Acceptance Criteria)
+
+**Scenarios (happy path + edge cases)**
+
+- [ ] **{Scenario 1 name}** — Given {state}, When {action}, Then {observable outcome}
+- [ ] **{Scenario 2 name}** — Given {state}, When {action}, Then {observable outcome}
+
+**Must NOT happen**
+
+- [ ] {Negative criterion 1 — e.g., "no disliked ingredient in generated week"}
+- [ ] {Negative criterion 2}
+
+**Where to look**
+
+| Check | Where |
+|-------|-------|
+| {observable outcome} | {URL / DB query / log line} |
+
+### If something is wrong
+
+Report back what failed (which scenario / negative criterion), and from which screen / response / log line. Do NOT mark the plan complete until the owner confirms.
 ```
 
 ### Archive Plan
@@ -294,6 +330,37 @@ If all tasks in the plan are complete, call `mcp__github__issue_write` with:
 1. Review the report
 2. Create PR: `gh pr create`
 3. Merge when approved
+
+---
+
+## How to Run & Verify
+
+> **Last step — owner runs this manually before merge.** Copy from the report's
+> "How to Run & Verify" section so the checklist is the final thing on screen.
+
+### Run locally
+
+```bash
+{exact runnable commands}
+```
+
+### What to check (from plan's Acceptance Criteria)
+
+**Scenarios**
+
+- [ ] {Scenario 1} — Given {state}, When {action}, Then {outcome}
+- [ ] {Scenario 2} — Given {state}, When {action}, Then {outcome}
+
+**Must NOT happen**
+
+- [ ] {Negative criterion 1}
+- [ ] {Negative criterion 2}
+
+**Where to look**
+
+| Check | Where |
+|-------|-------|
+| {outcome} | {URL / DB / log} |
 ```
 
 ---

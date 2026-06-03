@@ -210,6 +210,32 @@ Execute in order. Each task is atomic and verifiable.
 
 ## Acceptance Criteria
 
+Product-level criteria the feature must satisfy. Write concrete, observable behavior — not "works correctly". These criteria drive the "How to run & verify" block in the implementation report, so phrase them as something the owner can check by hand.
+
+### Scenarios (Given / When / Then)
+
+Write at least one happy-path scenario and one edge-case scenario. Each step must be observable from the UI, API response, or DB row — not internal state.
+
+1. **{Happy path scenario name}**
+   - **Given** {initial state — e.g., "household profile exists, pantry has {salt, oil}, disliked list has {olives}"}
+   - **When** {user action — e.g., "owner taps Generate Week on /plan"}
+   - **Then** {observable outcome — e.g., "3 recipe cards render in RU/FI/EN, none contain olives, shopping list groups by store category"}
+
+2. **{Edge case scenario name}**
+   - **Given** {initial state}
+   - **When** {user action}
+   - **Then** {observable outcome}
+
+### Negative Criteria (must NOT happen)
+
+Concrete behaviors the feature must NOT exhibit. These catch regressions and silent failures.
+
+- [ ] {Hard constraint — e.g., "no disliked ingredient appears in any generated recipe"}
+- [ ] {No-regression — e.g., "previous week's plan remains accessible in /archive"}
+- [ ] {No-leak — e.g., "LLM prompt contents never appear in logs"}
+
+### Engineering Done
+
 - [ ] All tasks completed
 - [ ] Type check passes
 - [ ] Tests pass
